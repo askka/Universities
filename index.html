@@ -1,0 +1,4191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>高校排名动态切换</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts/map/js/world.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #8B5CF6; /* 紫色背景 */
+			font-family: Arial, sans-serif;
+    }
+    #logoBar {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      padding: 15px 0;
+      background-color: #CFBCFB;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    #logoBar h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    
+    #logoBar img {
+      width: 60px;
+      height: 60px;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    #logoBar img.active {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+    /* 下拉筛选框样式，与Logo垂直居中对齐 */
+    #rankFilter {
+      margin-left: 20px;
+      padding: 5px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      height: 30px;
+      align-self: center;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+    }
+    #chart {
+      width: 100vw;
+      height: calc(100vh - 90px); /* 减去 logoBar 高度 */
+    }
+  </style>
+</head>
+<body>
+
+<div id="logoBar">
+  <h1 style="text-align: left; margin: 0;">World University <br>Ranking TOP100</h1>
+  <img src="logo/qs.png" data-type="qs" class="rank-logo active" title="QS排名">
+  <img src="logo/usnews.png" data-type="usnews" class="rank-logo" title="U.S. News排名">
+  <img src="logo/the.png" data-type="the" class="rank-logo" title="THE排名">
+  <img src="logo/arwu.png" data-type="arwu" class="rank-logo" title="ARWU排名">
+  <!-- 新增Top筛选下拉菜单 -->
+  <select id="rankFilter">
+    <option value="all">ALL</option>
+    <option value="10">Top10</option>
+    <option value="30">Top30</option>
+    <option value="50">Top50</option>
+    <option value="100">Top100</option>
+  </select>
+</div>
+
+<div id="chart"></div>
+<script>
+  // ====== 1. 基础配置与数据 ======
+  const RANKING_URL_TEMPLATES = {
+    qs:      "https://www.topuniversities.com/universities/{slug}",
+    usnews:  "https://www.usnews.com/education/best-global-universities/{slug}",
+    the:     "https://www.timeshighereducation.com/world-university-rankings/{slug}",
+    arwu:    "https://www.shanghairanking.com/institution/{slug}"
+  };
+  // 高校数据
+ 
+	const universities = [
+  {
+    "name": "Aarhus University",
+    "coords": [
+      10.2073,
+      56.156886
+    ],
+    "homepage": "https://www.au.dk/en",
+    "rankings": {
+      "qs": {
+        "rank": 131,
+        "slug": "aarhus-university"
+      },
+      "usnews": {
+        "rank": 117,
+        "slug": "aarhus-university-502125"
+      },
+      "the": {
+        "rank": 101,
+        "slug": "aarhus-university"
+      },
+      "arwu": {
+        "rank": 85,
+        "slug": "aarhus-university"
+      }
+    }
+  },
+  {
+    "name": "University of Adelaide",
+    "coords": [
+      138.5986,
+      -34.9285
+    ],
+    "homepage": "https://www.adelaide.edu.au",
+    "rankings": {
+      "qs": {
+        "rank": 82,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 99,
+        "slug": "university-of-adelaide-504015"
+      },
+      "the": {
+        "rank": 176,
+        "slug": "university-adelaide"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "the-university-of-adelaide"
+      }
+    }
+  },
+  {
+    "name": "Australian National University",
+    "coords": [
+      149.13,
+      -35.2778
+    ],
+    "homepage": "https://www.anu.edu.au",
+    "rankings": {
+      "qs": {
+        "rank": 32,
+        "slug": "australian-national-university"
+      },
+      "usnews": {
+        "rank": 86,
+        "slug": "australian-national-university-503825"
+      },
+      "the": {
+        "rank": 73,
+        "slug": "australian-national-university"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "the-australian-national-university"
+      }
+    }
+  },
+  {
+    "name": "Brown University",
+    "coords": [
+      -71.4,
+      41.8268
+    ],
+    "homepage": "https://www.brown.edu",
+    "rankings": {
+      "qs": {
+        "rank": 69,
+        "slug": "brown-university"
+      },
+      "usnews": {
+        "rank": 150,
+        "slug": "brown-university-217156"
+      },
+      "the": {
+        "rank": 65,
+        "slug": "brown-university"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "brown-university"
+      }
+    }
+  },
+  {
+    "name": "California Institute of Technology",
+    "coords": [
+      -118.1228,
+      34.1478
+    ],
+    "homepage": "https://www.caltech.edu",
+    "rankings": {
+      "qs": {
+        "rank": 10,
+        "slug": "california-institute-technology-caltech"
+      },
+      "usnews": {
+        "rank": 23,
+        "slug": "california-institute-of-technology-110404"
+      },
+      "the": {
+        "rank": 7,
+        "slug": "california-institute-technology-caltech"
+      },
+      "arwu": {
+        "rank": 9,
+        "slug": "california-institute-of-technology"
+      }
+    }
+  },
+  {
+    "name": "Carnegie Mellon University",
+    "coords": [
+      -79.944158,
+      40.4432
+    ],
+    "homepage": "https://www.cmu.edu",
+    "rankings": {
+      "qs": {
+        "rank": 52,
+        "slug": "carnegie-mellon-university"
+      },
+      "usnews": {
+        "rank": 126,
+        "slug": "carnegie-mellon-university-211440"
+      },
+      "the": {
+        "rank": 24,
+        "slug": "carnegie-mellon-university"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "carnegie-mellon-university"
+      }
+    }
+  },
+  {
+    "name": "Central South University",
+    "coords": [
+      112.9842,
+      28.188056
+    ],
+    "homepage": "https://www.csu.edu.cn/",
+    "rankings": {
+      "qs": {
+        "rank": 491,
+        "slug": "central-south-university"
+      },
+      "usnews": {
+        "rank": 146,
+        "slug": "central-south-university-501467"
+      },
+      "the": {
+        "rank": 250,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 96,
+        "slug": "central-south-university"
+      }
+    }
+  },
+  {
+    "name": "Charité – Universit?tsmedizin Berlin",
+    "coords": [
+      13.38886,
+      52.520007
+    ],
+    "homepage": "https://www.charite.de/en/",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": null,
+        "slug": null
+      },
+      "the": {
+        "rank": 91,
+        "slug": "charite-universitatsmedizin-berlin"
+      },
+      "arwu": {
+        "rank": null,
+        "slug": null
+      }
+    }
+  },
+  {
+    "name": "Columbia University",
+    "coords": [
+      -73.9632,
+      40.8075
+    ],
+    "homepage": "https://www.columbia.edu",
+    "rankings": {
+      "qs": {
+        "rank": 38,
+        "slug": "columbia-university"
+      },
+      "usnews": {
+        "rank": 10,
+        "slug": "columbia-university-190150"
+      },
+      "the": {
+        "rank": 20,
+        "slug": "columbia-university"
+      },
+      "arwu": {
+        "rank": 8,
+        "slug": "columbia-university"
+      }
+    }
+  },
+  {
+    "name": "Cornell University",
+    "coords": [
+      -76.4817,
+      42.4467
+    ],
+    "homepage": "https://www.cornell.edu",
+    "rankings": {
+      "qs": {
+        "rank": 16,
+        "slug": "cornell-university"
+      },
+      "usnews": {
+        "rank": 16,
+        "slug": "cornell-university-190415"
+      },
+      "the": {
+        "rank": 18,
+        "slug": "cornell-university"
+      },
+      "arwu": {
+        "rank": 12,
+        "slug": "cornell-university"
+      }
+    }
+  },
+  {
+    "name": "Delft University of Technology",
+    "coords": [
+      4.3571,
+      52.0116
+    ],
+    "homepage": "https://www.tudelft.nl/en/",
+    "rankings": {
+      "qs": {
+        "rank": 47,
+        "slug": "delft-university-technology"
+      },
+      "usnews": {
+        "rank": 191,
+        "slug": "delft-university-of-technology-505496"
+      },
+      "the": {
+        "rank": 57,
+        "slug": "delft-university-technology"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "delft-university-of-technology"
+      }
+    }
+  },
+  {
+    "name": "Duke University",
+    "coords": [
+      -78.9388,
+      36.0014
+    ],
+    "homepage": "https://www.duke.edu",
+    "rankings": {
+      "qs": {
+        "rank": 88,
+        "slug": "purdue-university"
+      },
+      "usnews": {
+        "rank": 27,
+        "slug": "duke-university-198419"
+      },
+      "the": {
+        "rank": 28,
+        "slug": "duke-university"
+      },
+      "arwu": {
+        "rank": 46,
+        "slug": "duke-university"
+      }
+    }
+  },
+  {
+    "name": "Durham University",
+    "coords": [
+      -1.5597,
+      54.7753
+    ],
+    "homepage": "https://www.durham.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 94,
+        "slug": "durham-university"
+      },
+      "usnews": {
+        "rank": 292,
+        "slug": "durham-university-501717"
+      },
+      "the": {
+        "rank": 175,
+        "slug": "durham-university"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "durham-university"
+      }
+    }
+  },
+  {
+    "name": "ETH Zurich Swiss Federal Institute of Technology",
+    "coords": [
+      8.5417,
+      47.3769
+    ],
+    "homepage": "https://ethz.ch/en.html",
+    "rankings": {
+      "qs": {
+        "rank": 7,
+        "slug": "eth-zurich-swiss-federal-institute-technology"
+      },
+      "usnews": {
+        "rank": 35,
+        "slug": "eth-zurich-502241"
+      },
+      "the": {
+        "rank": 11,
+        "slug": "eth-zurich"
+      },
+      "arwu": {
+        "rank": 22,
+        "slug": "eth-zurich"
+      }
+    }
+  },
+  {
+    "name": "Emory University",
+    "coords": [
+      -84.3963,
+      33.7925
+    ],
+    "homepage": "https://www.emory.edu",
+    "rankings": {
+      "qs": {
+        "rank": 182,
+        "slug": "emory-university"
+      },
+      "usnews": {
+        "rank": 69,
+        "slug": "emory-university-139658"
+      },
+      "the": {
+        "rank": 102,
+        "slug": "emory-university"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "emory-university"
+      }
+    }
+  },
+  {
+    "name": "Erasmus University Rotterdam",
+    "coords": [
+      4.4812,
+      51.9225
+    ],
+    "homepage": "https://www.eur.nl",
+    "rankings": {
+      "qs": {
+        "rank": 140,
+        "slug": "erasmus-university-rotterdam"
+      },
+      "usnews": {
+        "rank": 76,
+        "slug": "erasmus-university-rotterdam-500349"
+      },
+      "the": {
+        "rank": 107,
+        "slug": "erasmus-university-rotterdam"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "erasmus-university-rotterdam"
+      }
+    }
+  },
+  {
+    "name": "Freie Universitaet Berlin",
+    "coords": [
+      13.3888599,
+      52.5163
+    ],
+    "homepage": "https://www.fu-berlin.de",
+    "rankings": {
+      "qs": {
+        "rank": 88,
+        "slug": "freie-universitaet-berlin"
+      },
+      "usnews": {
+        "rank": 59,
+        "slug": "free-university-of-berlin-502084"
+      },
+      "the": {
+        "rank": 113,
+        "slug": "free-university-berlin"
+      },
+      "arwu": {
+        "rank": 202,
+        "slug": "free-university-berlin"
+      }
+    }
+  },
+  {
+    "name": "Wuhan University",
+    "coords": [
+      114.35,
+      31.2995
+    ],
+    "homepage": "https://www.fudan.edu.cn/en/",
+    "rankings": {
+      "qs": {
+        "rank": 186,
+        "slug": "wuhan-university"
+      },
+      "usnews": {
+        "rank": 90,
+        "slug": "wuhan-university-503252"
+      },
+      "the": {
+        "rank": 122,
+        "slug": "wuhan-university"
+      },
+      "arwu": {
+        "rank": 81,
+        "slug": "wuhan-university"
+      }
+    }
+  },
+  {
+    "name": "Ghent University",
+    "coords": [
+      3.7275,
+      51.0538
+    ],
+    "homepage": "https://www.ugent.be/",
+    "rankings": {
+      "qs": {
+        "rank": 162,
+        "slug": "ghent-university"
+      },
+      "usnews": {
+        "rank": 107,
+        "slug": "ghent-university-506883"
+      },
+      "the": {
+        "rank": 115,
+        "slug": "ghent-university"
+      },
+      "arwu": {
+        "rank": 91,
+        "slug": "ghent-university"
+      }
+    }
+  },
+  {
+    "name": "Harvard University",
+    "coords": [
+      -71.1097,
+      42.377
+    ],
+    "homepage": "https://www.harvard.edu",
+    "rankings": {
+      "qs": {
+        "rank": 5,
+        "slug": "harvard-university"
+      },
+      "usnews": {
+        "rank": 1,
+        "slug": "harvard-university-166027"
+      },
+      "the": {
+        "rank": 5,
+        "slug": "harvard-university"
+      },
+      "arwu": {
+        "rank": 1,
+        "slug": "harvard-university"
+      }
+    }
+  },
+  {
+    "name": "Hebrew University of Jerusalem",
+    "coords": [
+      35.2137,
+      31.7781
+    ],
+    "homepage": "https://www.huji.ac.il",
+    "rankings": {
+      "qs": {
+        "rank": 240,
+        "slug": "hebrew-university-jerusalem"
+      },
+      "usnews": {
+        "rank": 271,
+        "slug": "hebrew-university-of-jerusalem-500554"
+      },
+      "the": {
+        "rank": 250,
+        "slug": "hebrew-university-jerusalem"
+      },
+      "arwu": {
+        "rank": 88,
+        "slug": "the-hebrew-university-of-jerusalem"
+      }
+    }
+  },
+  {
+    "name": "Hong Kong Polytechnic University",
+    "coords": [
+      114.1741,
+      22.3068
+    ],
+    "homepage": "https://www.polyu.edu.hk",
+    "rankings": {
+      "qs": {
+        "rank": 54,
+        "slug": "hong-kong-polytechnic-university"
+      },
+      "usnews": {
+        "rank": 58,
+        "slug": "hong-kong-polytechnic-university-500421"
+      },
+      "the": {
+        "rank": 83,
+        "slug": "hong-kong-polytechnic-university"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "the-hong-kong-polytechnic-university"
+      }
+    }
+  },
+  {
+    "name": "Hong Kong University of Science and Technology",
+    "coords": [
+      114.3947,
+      22.336
+    ],
+    "homepage": "https://www.ust.hk",
+    "rankings": {
+      "qs": {
+        "rank": 44,
+        "slug": "hong-kong-university-science-technology"
+      },
+      "usnews": {
+        "rank": 101,
+        "slug": "hong-kong-university-of-science-technology-503260"
+      },
+      "the": {
+        "rank": 58,
+        "slug": "hong-kong-university-science-and-technology"
+      },
+      "arwu": {
+        "rank": 73,
+        "slug": "huazhong-university-of-science-and-technology"
+      }
+    }
+  },
+  {
+    "name": "Humboldt University of Berlin",
+    "coords": [
+      13.3903,
+      52.520008
+    ],
+    "homepage": "https://www.hu-berlin.de/en",
+    "rankings": {
+      "qs": {
+        "rank": 130,
+        "slug": "humboldt-universitat-zu-berlin"
+      },
+      "usnews": {
+        "rank": 47,
+        "slug": "humboldt-university-of-berlin-506698"
+      },
+      "the": {
+        "rank": 89,
+        "slug": "humboldt-university-berlin"
+      },
+      "arwu": {
+        "rank": 51,
+        "slug": "heidelberg-university"
+      }
+    }
+  },
+  {
+    "name": "Icahn School of Medicine Mount Sinai",
+    "coords": [
+      -73.9665,
+      40.7812
+    ],
+    "homepage": "https://icahn.mssm.edu",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 40,
+        "slug": "icahn-school-of-medicine-at-mount-sinai-193405"
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "icahn-school-of-medicine-at-mount-sinai"
+      }
+    }
+  },
+  {
+    "name": "Imperial College London",
+    "coords": [
+      -0.1772,
+      51.5096
+    ],
+    "homepage": "https://www.imperial.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 2,
+        "slug": "imperial-college-london"
+      },
+      "usnews": {
+        "rank": 11,
+        "slug": "imperial-college-london-505571"
+      },
+      "the": {
+        "rank": 8,
+        "slug": "imperial-college-london"
+      },
+      "arwu": {
+        "rank": 26,
+        "slug": "imperial-college-london"
+      }
+    }
+  },
+  {
+    "name": "Institut Polytechnique de Paris",
+    "coords": [
+      2.3488,
+      48.8766
+    ],
+    "homepage": "https://www.ip-paris.fr/en",
+    "rankings": {
+      "qs": {
+        "rank": 41,
+        "slug": "institut-polytechnique-de-paris"
+      },
+      "usnews": {
+        "rank": 323,
+        "slug": "institut-polytechnique-de-paris-530531"
+      },
+      "the": {
+        "rank": 68,
+        "slug": "institut-polytechnique-de-paris"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "institut-polytechnique-de-paris"
+      }
+    }
+  },
+  {
+    "name": "Johns Hopkins University",
+    "coords": [
+      -76.6107,
+      39.3292
+    ],
+    "homepage": "https://www.jhu.edu/",
+    "rankings": {
+      "qs": {
+        "rank": 24,
+        "slug": "johns-hopkins-university"
+      },
+      "usnews": {
+        "rank": 14,
+        "slug": "johns-hopkins-university-162928"
+      },
+      "the": {
+        "rank": 16,
+        "slug": "johns-hopkins-university"
+      },
+      "arwu": {
+        "rank": 19,
+        "slug": "johns-hopkins-university"
+      }
+    }
+  },
+  {
+    "name": "KIT Karlsruhe Institute of Technology",
+    "coords": [
+      8.4037,
+      49.0134
+    ],
+    "homepage": "https://www.kit.edu",
+    "rankings": {
+      "qs": {
+        "rank": 98,
+        "slug": "kit-karlsruhe-institute-technology"
+      },
+      "usnews": {
+        "rank": 278,
+        "slug": "karlsruhe-institute-of-technology-502442"
+      },
+      "the": {
+        "rank": 166,
+        "slug": "karlsruhe-institute-technology"
+      },
+      "arwu": {
+        "rank": 301,
+        "slug": "karlsruhe-institute-of-technology-kit"
+      }
+    }
+  },
+  {
+    "name": "KTH Royal Institute of Technology",
+    "coords": [
+      18.0710935,
+      59.3498
+    ],
+    "homepage": "https://www.kth.se",
+    "rankings": {
+      "qs": {
+        "rank": 85,
+        "slug": "tokyo-institute-technology-tokyo-tech"
+      },
+      "usnews": {
+        "rank": 252,
+        "slug": "royal-institute-of-technology-505970"
+      },
+      "the": {
+        "rank": 98,
+        "slug": "kth-royal-institute-technology"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "kth-royal-institute-of-technology"
+      }
+    }
+  },
+  {
+    "name": "KU Leuven",
+    "coords": [
+      4.7005,
+      50.8799
+    ],
+    "homepage": "https://www.kuleuven.be/english/",
+    "rankings": {
+      "qs": {
+        "rank": 60,
+        "slug": "ku-leuven"
+      },
+      "usnews": {
+        "rank": 50,
+        "slug": "ku-leuven-504785"
+      },
+      "the": {
+        "rank": 46,
+        "slug": "ku-leuven"
+      },
+      "arwu": {
+        "rank": 76,
+        "slug": "ku-leuven"
+      }
+    }
+  },
+  {
+    "name": "Karolinska Institutet",
+    "coords": [
+      18.071093,
+      59.3468
+    ],
+    "homepage": "https://www.ki.se/en",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 52,
+        "slug": "karolinska-institutet-503151"
+      },
+      "the": {
+        "rank": 53,
+        "slug": "karolinska-institute"
+      },
+      "arwu": {
+        "rank": 50,
+        "slug": "karolinska-institute"
+      }
+    }
+  },
+  {
+    "name": "King Fahd University of Petroleum and Minerals",
+    "coords": [
+      46.7203,
+      26.326
+    ],
+    "homepage": "http://www.kfupm.edu.sa",
+    "rankings": {
+      "qs": {
+        "rank": 67,
+        "slug": "king-fahd-university-petroleum-minerals"
+      },
+      "usnews": {
+        "rank": 314,
+        "slug": "king-fahd-university-of-petroleum-minerals-506100"
+      },
+      "the": {
+        "rank": 184,
+        "slug": "king-fahd-university-petroleum-and-minerals"
+      },
+      "arwu": {
+        "rank": 701,
+        "slug": "king-fahd-university-of-petroleum-minerals"
+      }
+    }
+  },
+  {
+    "name": "King's College London",
+    "coords": [
+      -0.1276,
+      51.5123
+    ],
+    "homepage": "https://www.kcl.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 31,
+        "slug": "kings-college-london"
+      },
+      "usnews": {
+        "rank": 36,
+        "slug": "kings-college-london-500330"
+      },
+      "the": {
+        "rank": 38,
+        "slug": "kings-college-london"
+      },
+      "arwu": {
+        "rank": 61,
+        "slug": "kings-college-london"
+      }
+    }
+  },
+  {
+    "name": "Korea Advanced Institute of Science and Technology",
+    "coords": [
+      127.4568,
+      36.3705
+    ],
+    "homepage": "https://www.kaist.ac.kr",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 281,
+        "slug": "korea-advanced-institute-of-science-technology-kaist-506336"
+      },
+      "the": {
+        "rank": 70,
+        "slug": "korea-advanced-institute-science-and-technology-kaist"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "korea-advanced-institute-of-science-and-technology"
+      }
+    }
+  },
+  {
+    "name": "Korea University",
+    "coords": [
+      127.02761,
+      37.585965
+    ],
+    "homepage": "https://www.korea.ac.kr",
+    "rankings": {
+      "qs": {
+        "rank": 61,
+        "slug": "korea-university"
+      },
+      "usnews": {
+        "rank": 288,
+        "slug": "korea-university-505391"
+      },
+      "the": {
+        "rank": 156,
+        "slug": "korea-university"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "korea-university"
+      }
+    }
+  },
+  {
+    "name": "Kyoto University",
+    "coords": [
+      135.7593,
+      35.0116
+    ],
+    "homepage": "https://www.kyoto-u.ac.jp/en",
+    "rankings": {
+      "qs": {
+        "rank": 57,
+        "slug": "kyoto-university"
+      },
+      "usnews": {
+        "rank": 187,
+        "slug": "kyoto-university-505388"
+      },
+      "the": {
+        "rank": 46,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 46,
+        "slug": "kyoto-university"
+      }
+    }
+  },
+  {
+    "name": "LMU Munich",
+    "coords": [
+      11.5761,
+      48.1501
+    ],
+    "homepage": "https://www.lmu.de/en/",
+    "rankings": {
+      "qs": {
+        "rank": 58,
+        "slug": "ludwig-maximilians-universitat-munchen"
+      },
+      "usnews": {
+        "rank": 57,
+        "slug": "university-of-munich-500951"
+      },
+      "the": {
+        "rank": 34,
+        "slug": "lmu-munich"
+      },
+      "arwu": {
+        "rank": 42,
+        "slug": "university-of-munich"
+      }
+    }
+  },
+  {
+    "name": "Leiden University",
+    "coords": [
+      4.3007,
+      52.1579
+    ],
+    "homepage": "https://www.leidenuniv.nl",
+    "rankings": {
+      "qs": {
+        "rank": 119,
+        "slug": "leiden-university"
+      },
+      "usnews": {
+        "rank": 56,
+        "slug": "leiden-university-503069"
+      },
+      "the": {
+        "rank": 70,
+        "slug": "leiden-university"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "leiden-university"
+      }
+    }
+  },
+  {
+    "name": "London School of Economics and Political Science",
+    "coords": [
+      0.1079,
+      51.5142
+    ],
+    "homepage": "https://www.lse.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 56,
+        "slug": "london-school-economics-political-science-lse"
+      },
+      "usnews": {
+        "rank": 234,
+        "slug": "london-school-economics-political-science-502076"
+      },
+      "the": {
+        "rank": 52,
+        "slug": "london-school-economics-and-political-science"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "london-school-of-economics-and-political-science"
+      }
+    }
+  },
+  {
+    "name": "Lund University",
+    "coords": [
+      13.191,
+      55.7041
+    ],
+    "homepage": "https://www.lunduniversity.lu.se/",
+    "rankings": {
+      "qs": {
+        "rank": 72,
+        "slug": "lund-university"
+      },
+      "usnews": {
+        "rank": 121,
+        "slug": "lund-university-500083"
+      },
+      "the": {
+        "rank": 95,
+        "slug": "lund-university"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "lund-university"
+      }
+    }
+  },
+  {
+    "name": "Massachusetts Institute of Technology",
+    "coords": [
+      -71.0921,
+      42.3601
+    ],
+    "homepage": "https://web.mit.edu",
+    "rankings": {
+      "qs": {
+        "rank": 1,
+        "slug": "massachusetts-institute-technology-mit"
+      },
+      "usnews": {
+        "rank": 2,
+        "slug": "massachusetts-institute-of-technology-mit-166683"
+      },
+      "the": {
+        "rank": 2,
+        "slug": "massachusetts-institute-technology"
+      },
+      "arwu": {
+        "rank": 3,
+        "slug": "massachusetts-institute-of-technology-mit"
+      }
+    }
+  },
+  {
+    "name": "McGill University",
+    "coords": [
+      -73.5726,
+      45.5047
+    ],
+    "homepage": "https://www.mcgill.ca/",
+    "rankings": {
+      "qs": {
+        "rank": 27,
+        "slug": "mcgill-university"
+      },
+      "usnews": {
+        "rank": 62,
+        "slug": "mcgill-university-499986"
+      },
+      "the": {
+        "rank": 41,
+        "slug": "mcgill-university"
+      },
+      "arwu": {
+        "rank": 76,
+        "slug": "mcgill-university"
+      }
+    }
+  },
+  {
+    "name": "Monash University",
+    "coords": [
+      145.1341,
+      -37.8136
+    ],
+    "homepage": "https://www.monash.edu",
+    "rankings": {
+      "qs": {
+        "rank": 36,
+        "slug": "monash-university"
+      },
+      "usnews": {
+        "rank": 38,
+        "slug": "monash-university-500301"
+      },
+      "the": {
+        "rank": 58,
+        "slug": "monash-university"
+      },
+      "arwu": {
+        "rank": 76,
+        "slug": "monash-university"
+      }
+    }
+  },
+  {
+    "name": "Nanjing University",
+    "coords": [
+      118.7969,
+      32.0603
+    ],
+    "homepage": "https://www.nju.edu.cn/",
+    "rankings": {
+      "qs": {
+        "rank": 103,
+        "slug": "nanjing-university"
+      },
+      "usnews": {
+        "rank": 86,
+        "slug": "nanjing-university-503849"
+      },
+      "the": {
+        "rank": 62,
+        "slug": "nanjing-university"
+      },
+      "arwu": {
+        "rank": 75,
+        "slug": "nanjing-university"
+      }
+    }
+  },
+  {
+    "name": "Nanyang Technological University Singapore",
+    "coords": [
+      103.7763,
+      1.3455
+    ],
+    "homepage": "https://www.ntu.edu.sg",
+    "rankings": {
+      "qs": {
+        "rank": 12,
+        "slug": "nanyang-technological-university-singapore-ntu"
+      },
+      "usnews": {
+        "rank": 28,
+        "slug": "nanyang-technological-university-503366"
+      },
+      "the": {
+        "rank": 31,
+        "slug": "nanyang-technological-university-singapore"
+      },
+      "arwu": {
+        "rank": 88,
+        "slug": "nanyang-technological-university"
+      }
+    }
+  },
+  {
+    "name": "National Taiwan University",
+    "coords": [
+      121.5273286,
+      25.0147157
+    ],
+    "homepage": "http://www.ntu.edu.tw",
+    "rankings": {
+      "qs": {
+        "rank": 63,
+        "slug": "national-taiwan-university-ntu"
+      },
+      "usnews": {
+        "rank": 248,
+        "slug": "national-taiwan-university-504077"
+      },
+      "the": {
+        "rank": 140,
+        "slug": "national-taiwan-university-ntu"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "national-taiwan-university"
+      }
+    }
+  },
+  {
+    "name": "National University of Singapore",
+    "coords": [
+      103.7766,
+      1.3043
+    ],
+    "homepage": "https://www.nus.edu.sg",
+    "rankings": {
+      "qs": {
+        "rank": 8,
+        "slug": "national-university-singapore-nus"
+      },
+      "usnews": {
+        "rank": 20,
+        "slug": "national-university-of-singapore-505009"
+      },
+      "the": {
+        "rank": 17,
+        "slug": "national-university-singapore"
+      },
+      "arwu": {
+        "rank": 56,
+        "slug": "national-university-of-singapore"
+      }
+    }
+  },
+  {
+    "name": "New York University",
+    "coords": [
+      -73.9854,
+      40.7291
+    ],
+    "homepage": "https://www.nyu.edu",
+    "rankings": {
+      "qs": {
+        "rank": 55,
+        "slug": "new-york-university-nyu"
+      },
+      "usnews": {
+        "rank": 32,
+        "slug": "new-york-university-193900"
+      },
+      "the": {
+        "rank": 31,
+        "slug": "new-york-university"
+      },
+      "arwu": {
+        "rank": 28,
+        "slug": "new-york-university"
+      }
+    }
+  },
+  {
+    "name": "Northwestern University",
+    "coords": [
+      -87.623177,
+      42.0574063
+    ],
+    "homepage": "https://www.northwestern.edu",
+    "rankings": {
+      "qs": {
+        "rank": 42,
+        "slug": "northwestern-university"
+      },
+      "usnews": {
+        "rank": 24,
+        "slug": "northwestern-university-147767"
+      },
+      "the": {
+        "rank": 30,
+        "slug": "northwestern-university"
+      },
+      "arwu": {
+        "rank": 31,
+        "slug": "northwestern-university"
+      }
+    }
+  },
+  {
+    "name": "Ohio State University",
+    "coords": [
+      -83.0006,
+      40.0077
+    ],
+    "homepage": "https://www.osu.edu",
+    "rankings": {
+      "qs": {
+        "rank": 190,
+        "slug": "ohio-state-university"
+      },
+      "usnews": {
+        "rank": 66,
+        "slug": "ohio-state-university-204796"
+      },
+      "the": {
+        "rank": 108,
+        "slug": "ohio-state-university-main-campus"
+      },
+      "arwu": {
+        "rank": 83,
+        "slug": "the-ohio-state-university-columbus"
+      }
+    }
+  },
+  {
+    "name": "Osaka University",
+    "coords": [
+      135.519,
+      34.7851
+    ],
+    "homepage": "https://www.osaka-u.ac.jp/en",
+    "rankings": {
+      "qs": {
+        "rank": 91,
+        "slug": "osaka-university"
+      },
+      "usnews": {
+        "rank": 314,
+        "slug": "the-university-of-osaka-505864"
+      },
+      "the": {
+        "rank": 151,
+        "slug": "osaka-university"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "osaka-university"
+      }
+    }
+  },
+  {
+    "name": "Paris Saclay University",
+    "coords": [
+      2.2068,
+      48.709
+    ],
+    "homepage": "https://www.universite-paris-saclay.fr/en",
+    "rankings": {
+      "qs": {
+        "rank": 70,
+        "slug": "universite-paris-saclay"
+      },
+      "usnews": {
+        "rank": 78,
+        "slug": "universite-paris-saclay-529676"
+      },
+      "the": {
+        "rank": 68,
+        "slug": "universite-paris-saclay"
+      },
+      "arwu": {
+        "rank": 13,
+        "slug": "paris-saclay-university"
+      }
+    }
+  },
+  {
+    "name": "Peking University",
+    "coords": [
+      116.3074,
+      39.9975
+    ],
+    "homepage": "https://english.pku.edu.cn",
+    "rankings": {
+      "qs": {
+        "rank": 14,
+        "slug": "peking-university"
+      },
+      "usnews": {
+        "rank": 25,
+        "slug": "peking-university-501148"
+      },
+      "the": {
+        "rank": 13,
+        "slug": "peking-university"
+      },
+      "arwu": {
+        "rank": 23,
+        "slug": "peking-university"
+      }
+    }
+  },
+  {
+    "name": "Pennsylvania State University",
+    "coords": [
+      -77.8422,
+      40.7903
+    ],
+    "homepage": "https://www.psu.edu",
+    "rankings": {
+      "qs": {
+        "rank": 82,
+        "slug": "pennsylvania-state-university"
+      },
+      "usnews": {
+        "rank": 91,
+        "slug": "pennsylvania-state-university-214777"
+      },
+      "the": {
+        "rank": 108,
+        "slug": "penn-state-main-campus"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "pennsylvania-state-university-university-park"
+      }
+    }
+  },
+  {
+    "name": "Politecnico di Milano",
+    "coords": [
+      9.22853,
+      45.4701
+    ],
+    "homepage": "https://www.polimi.it",
+    "rankings": {
+      "qs": {
+        "rank": 98,
+        "slug": "politecnico-di-milano"
+      },
+      "usnews": {
+        "rank": 338,
+        "slug": "polytechnic-university-of-milan-502229"
+      },
+      "the": {
+        "rank": 201,
+        "slug": "politecnico-di-milano"
+      },
+      "arwu": {
+        "rank": 301,
+        "slug": "polytechnic-university-of-milan"
+      }
+    }
+  },
+  {
+    "name": "Princeton University",
+    "coords": [
+      -74.6512,
+      40.3437
+    ],
+    "homepage": "https://www.princeton.edu",
+    "rankings": {
+      "qs": {
+        "rank": 25,
+        "slug": "princeton-university"
+      },
+      "usnews": {
+        "rank": 16,
+        "slug": "princeton-university-186131"
+      },
+      "the": {
+        "rank": 3,
+        "slug": "princeton-university"
+      },
+      "arwu": {
+        "rank": 7,
+        "slug": "princeton-university"
+      }
+    }
+  },
+  {
+    "name": "Purdue University West Lafayette",
+    "coords": [
+      -86.912,
+      40.4273
+    ],
+    "homepage": "https://www.purdue.edu",
+    "rankings": {
+      "qs": {
+        "rank": 88,
+        "slug": "purdue-university"
+      },
+      "usnews": {
+        "rank": 173,
+        "slug": "purdue-university-243780"
+      },
+      "the": {
+        "rank": 85,
+        "slug": "purdue-university-west-lafayette"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "purdue-university-west-lafayette"
+      }
+    }
+  },
+  {
+    "name": "Queen Mary University London",
+    "coords": [
+      -0.0569,
+      51.5244
+    ],
+    "homepage": "https://www.qmul.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 110,
+        "slug": "queen-mary-university-london"
+      },
+      "usnews": {
+        "rank": 94,
+        "slug": "queen-mary-university-london-503389"
+      },
+      "the": {
+        "rank": 134,
+        "slug": "queen-mary-university-london"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "queen-mary-university-of-london"
+      }
+    }
+  },
+  {
+    "name": "RWTH Aachen University",
+    "coords": [
+      6.0796,
+      50.775346
+    ],
+    "homepage": "https://www.rwth-aachen.de",
+    "rankings": {
+      "qs": {
+        "rank": 105,
+        "slug": "rwth-aachen-university"
+      },
+      "usnews": {
+        "rank": 225,
+        "slug": "rwth-aachen-university-506441"
+      },
+      "the": {
+        "rank": 92,
+        "slug": "rwth-aachen-university"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "rwth-aachen-university"
+      }
+    }
+  },
+  {
+    "name": "Rockefeller University",
+    "coords": [
+      -73.9632,
+      40.7608
+    ],
+    "homepage": "https://www.rockefeller.edu",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 104,
+        "slug": "rockefeller-university-195049"
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 29,
+        "slug": "rockefeller-university"
+      }
+    }
+  },
+  {
+    "name": "Heidelberg University",
+    "coords": [
+      8.6821,
+      49.412
+    ],
+    "homepage": "https://www.uni-heidelberg.de/en",
+    "rankings": {
+      "qs": {
+        "rank": 80,
+        "slug": "ruprecht-karls-universitat-heidelberg"
+      },
+      "usnews": {
+        "rank": 59,
+        "slug": "ruprecht-karls-university-heidelberg-506277"
+      },
+      "the": {
+        "rank": 49,
+        "slug": "universitat-heidelberg"
+      },
+      "arwu": {
+        "rank": 51,
+        "slug": "heidelberg-university"
+      }
+    }
+  },
+  {
+    "name": "Seoul National University",
+    "coords": [
+      126.9519,
+      37.5563
+    ],
+    "homepage": "https://en.snu.ac.kr",
+    "rankings": {
+      "qs": {
+        "rank": 38,
+        "slug": "seoul-national-university"
+      },
+      "usnews": {
+        "rank": 133,
+        "slug": "seoul-national-university-snu-503456"
+      },
+      "the": {
+        "rank": 58,
+        "slug": "seoul-national-university"
+      },
+      "arwu": {
+        "rank": 81,
+        "slug": "seoul-national-university"
+      }
+    }
+  },
+  {
+    "name": "Shanghai Jiao Tong University",
+    "coords": [
+      121.4477,
+      31.230416
+    ],
+    "homepage": "https://en.sjtu.edu.cn",
+    "rankings": {
+      "qs": {
+        "rank": 47,
+        "slug": "shanghai-jiao-tong-university"
+      },
+      "usnews": {
+        "rank": 46,
+        "slug": "shanghai-jiao-tong-university-501915"
+      },
+      "the": {
+        "rank": 40,
+        "slug": "shanghai-jiao-tong-university"
+      },
+      "arwu": {
+        "rank": 30,
+        "slug": "shanghai-jiao-tong-university"
+      }
+    }
+  },
+  {
+    "name": "Sorbonne University",
+    "coords": [
+      2.3488,
+      48.8539
+    ],
+    "homepage": "https://www.sorbonne-universite.fr",
+    "rankings": {
+      "qs": {
+        "rank": 72,
+        "slug": "sorbonne-university"
+      },
+      "usnews": {
+        "rank": 62,
+        "slug": "sorbonne-universite-529569"
+      },
+      "the": {
+        "rank": 76,
+        "slug": "sorbonne-university"
+      },
+      "arwu": {
+        "rank": 43,
+        "slug": "sorbonne-university"
+      }
+    }
+  },
+  {
+    "name": "Stanford University",
+    "coords": [
+      -122.1686,
+      37.4275
+    ],
+    "homepage": "https://www.stanford.edu",
+    "rankings": {
+      "qs": {
+        "rank": 3,
+        "slug": "stanford-university"
+      },
+      "usnews": {
+        "rank": 3,
+        "slug": "stanford-university-243744"
+      },
+      "the": {
+        "rank": 5,
+        "slug": "stanford-university"
+      },
+      "arwu": {
+        "rank": 2,
+        "slug": "stanford-university"
+      }
+    }
+  },
+  {
+    "name": "Stockholm University",
+    "coords": [
+      18.071093,
+      59.347053
+    ],
+    "homepage": "https://www.su.se",
+    "rankings": {
+      "qs": {
+        "rank": 147,
+        "slug": "stockholm-university"
+      },
+      "usnews": {
+        "rank": 156,
+        "slug": "stockholm-university-505458"
+      },
+      "the": {
+        "rank": 201,
+        "slug": "stockholm-university"
+      },
+      "arwu": {
+        "rank": 100,
+        "slug": "stockholm-university"
+      }
+    }
+  },
+  {
+    "name": "Sun Yat Sen University",
+    "coords": [
+      113.361037,
+      23.1238
+    ],
+    "homepage": "https://www.sysu.edu.cn/en",
+    "rankings": {
+      "qs": {
+        "rank": 276,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 85,
+        "slug": "sun-yat-sen-university-506062"
+      },
+      "the": {
+        "rank": 201,
+        "slug": "sun-yat-sen-university"
+      },
+      "arwu": {
+        "rank": 65,
+        "slug": "sun-yat-sen-university"
+      }
+    }
+  },
+  {
+    "name": "Sungkyunkwan University",
+    "coords": [
+      126.9519,
+      37.5855
+    ],
+    "homepage": "https://www.skku.edu/eng/",
+    "rankings": {
+      "qs": {
+        "rank": 126,
+        "slug": "sungkyunkwan-universityskku"
+      },
+      "usnews": {
+        "rank": 271,
+        "slug": "sungkyunkwan-university-skku-500193"
+      },
+      "the": {
+        "rank": 87,
+        "slug": "sungkyunkwan-university-skku"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "sungkyunkwan-university"
+      }
+    }
+  },
+  {
+    "name": "Swiss Federal Institute of Technology Lausanne",
+    "coords": [
+      6.6323,
+      46.5212
+    ],
+    "homepage": "https://www.epfl.ch/en/",
+    "rankings": {
+      "qs": {
+        "rank": 22,
+        "slug": "epfl"
+      },
+      "usnews": {
+        "rank": 86,
+        "slug": "ecole-polytechnique-federale-de-lausanne-501629"
+      },
+      "the": {
+        "rank": 35,
+        "slug": "ecole-polytechnique-federale-de-lausanne"
+      },
+      "arwu": {
+        "rank": 44,
+        "slug": "swiss-federal-institute-of-technology-lausanne"
+      }
+    }
+  },
+  {
+    "name": "Technical University of Munich",
+    "coords": [
+      11.5761,
+      48.1495
+    ],
+    "homepage": "https://www.tum.de",
+    "rankings": {
+      "qs": {
+        "rank": 22,
+        "slug": "technical-university-munich"
+      },
+      "usnews": {
+        "rank": 79,
+        "slug": "technical-university-of-munich-503109"
+      },
+      "the": {
+        "rank": 27,
+        "slug": "technical-university-munich"
+      },
+      "arwu": {
+        "rank": 45,
+        "slug": "technical-university-of-munich"
+      }
+    }
+  },
+  {
+    "name": "Technion Israel Institute of Technology",
+    "coords": [
+      34.7806,
+      32.7775
+    ],
+    "homepage": "https://www.technion.ac.il/en/",
+    "rankings": {
+      "qs": {
+        "rank": 350,
+        "slug": "technion-israel-institute-technology"
+      },
+      "usnews": {
+        "rank": 376,
+        "slug": "technion-israel-institute-of-technology-505919"
+      },
+      "the": {
+        "rank": 301,
+        "slug": "technion-israel-institute-technology"
+      },
+      "arwu": {
+        "rank": 97,
+        "slug": "technion-israel-institute-of-technology"
+      }
+    }
+  },
+  {
+    "name": "Trinity College Dublin The University of Dublin",
+    "coords": [
+      -6.2592,
+      53.3441
+    ],
+    "homepage": "https://www.tcd.ie",
+    "rankings": {
+      "qs": {
+        "rank": 75,
+        "slug": "trinity-college-dublin-university-dublin"
+      },
+      "usnews": {
+        "rank": 207,
+        "slug": "trinity-college-dublin-501570"
+      },
+      "the": {
+        "rank": 173,
+        "slug": "trinity-college-dublin"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "trinity-college-dublin"
+      }
+    }
+  },
+  {
+    "name": "Tsinghua University",
+    "coords": [
+      116.326516,
+      39.9975
+    ],
+    "homepage": "https://www.tsinghua.edu.cn/",
+    "rankings": {
+      "qs": {
+        "rank": 17,
+        "slug": "tsinghua-university"
+      },
+      "usnews": {
+        "rank": 11,
+        "slug": "tsinghua-university-503146"
+      },
+      "the": {
+        "rank": 12,
+        "slug": "tsinghua-university"
+      },
+      "arwu": {
+        "rank": 87,
+        "slug": "sichuan-university"
+      }
+    }
+  },
+  {
+    "name": "Universidad de Buenos Aires",
+    "coords": [
+      -58.3816,
+      -34.5997
+    ],
+    "homepage": "https://www.uba.ar",
+    "rankings": {
+      "qs": {
+        "rank": 84,
+        "slug": "universidad-de-buenos-aires-uba"
+      },
+      "usnews": {
+        "rank": 451,
+        "slug": "university-of-buenos-aires-504821"
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "university-of-buenos-aires"
+      }
+    }
+  },
+  {
+    "name": "Universite Paris Cite",
+    "coords": [
+      2.3488,
+      48.8566
+    ],
+    "homepage": "https://u-paris.fr/en/",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 47,
+        "slug": "universite-paris-cite-529677"
+      },
+      "the": {
+        "rank": 190,
+        "slug": "universite-paris-cite"
+      },
+      "arwu": {
+        "rank": 60,
+        "slug": "university-of-paris"
+      }
+    }
+  },
+  {
+    "name": "University of Malaya",
+    "coords": [
+      101.686855,
+      3.1357
+    ],
+    "homepage": "https://www.um.edu.my",
+    "rankings": {
+      "qs": {
+        "rank": 58,
+        "slug": "universiti-malaya-um"
+      },
+      "usnews": {
+        "rank": 331,
+        "slug": "universiti-malaya-501730"
+      },
+      "the": {
+        "rank": 201,
+        "slug": "university-malaya"
+      },
+      "arwu": {
+        "rank": 601,
+        "slug": "university-of-malaya"
+      }
+    }
+  },
+  {
+    "name": "University College London",
+    "coords": [
+      -0.1338,
+      51.5244
+    ],
+    "homepage": "https://www.ucl.ac.uk/",
+    "rankings": {
+      "qs": {
+        "rank": 9,
+        "slug": "ucl"
+      },
+      "usnews": {
+        "rank": 7,
+        "slug": "university-college-london-501693"
+      },
+      "the": {
+        "rank": 22,
+        "slug": "ucl"
+      },
+      "arwu": {
+        "rank": 14,
+        "slug": "university-college-london"
+      }
+    }
+  },
+  {
+    "name": "University of Alberta",
+    "coords": [
+      -113.5,
+      53.5232
+    ],
+    "homepage": "https://www.ualberta.ca",
+    "rankings": {
+      "qs": {
+        "rank": 94,
+        "slug": "university-alberta"
+      },
+      "usnews": {
+        "rank": 156,
+        "slug": "university-of-alberta-499977"
+      },
+      "the": {
+        "rank": 119,
+        "slug": "university-alberta"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "university-of-alberta"
+      }
+    }
+  },
+  {
+    "name": "University of Amsterdam",
+    "coords": [
+      4.9041,
+      52.3546
+    ],
+    "homepage": "https://www.uva.nl",
+    "rankings": {
+      "qs": {
+        "rank": 53,
+        "slug": "university-amsterdam"
+      },
+      "usnews": {
+        "rank": 33,
+        "slug": "university-of-amsterdam-502957"
+      },
+      "the": {
+        "rank": 62,
+        "slug": "university-amsterdam"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "university-of-amsterdam"
+      }
+    }
+  },
+  {
+    "name": "University of Auckland",
+    "coords": [
+      174.7633,
+      -36.8509
+    ],
+    "homepage": "https://www.auckland.ac.nz",
+    "rankings": {
+      "qs": {
+        "rank": 65,
+        "slug": "university-auckland"
+      },
+      "usnews": {
+        "rank": 128,
+        "slug": "university-of-auckland-503786"
+      },
+      "the": {
+        "rank": 156,
+        "slug": "university-auckland"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "the-university-of-auckland"
+      }
+    }
+  },
+  {
+    "name": "University of Barcelona",
+    "coords": [
+      2.1734,
+      41.3879
+    ],
+    "homepage": "https://www.ub.edu/en",
+    "rankings": {
+      "qs": {
+        "rank": 160,
+        "slug": "universitat-de-barcelona"
+      },
+      "usnews": {
+        "rank": 82,
+        "slug": "university-of-barcelona-500261"
+      },
+      "the": {
+        "rank": 145,
+        "slug": "university-barcelona"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "university-of-barcelona"
+      }
+    }
+  },
+  {
+    "name": "University of Birmingham",
+    "coords": [
+      -1.9026,
+      52.4862
+    ],
+    "homepage": "https://www.birmingham.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 76,
+        "slug": "university-birmingham"
+      },
+      "usnews": {
+        "rank": 94,
+        "slug": "university-of-birmingham-501524"
+      },
+      "the": {
+        "rank": 98,
+        "slug": "university-birmingham"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "university-of-birmingham"
+      }
+    }
+  },
+  {
+    "name": "University of Bonn",
+    "coords": [
+      7.0982,
+      50.7314
+    ],
+    "homepage": "https://www.uni-bonn.de",
+    "rankings": {
+      "qs": {
+        "rank": 200,
+        "slug": "rheinische-friedrich-wilhelms-universitat-bonn"
+      },
+      "usnews": {
+        "rank": 164,
+        "slug": "university-of-bonn-504578"
+      },
+      "the": {
+        "rank": 92,
+        "slug": "university-bonn"
+      },
+      "arwu": {
+        "rank": 68,
+        "slug": "university-of-bonn"
+      }
+    }
+  },
+  {
+    "name": "University of Bristol",
+    "coords": [
+      -2.5879,
+      51.4551
+    ],
+    "homepage": "https://www.bristol.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 51,
+        "slug": "university-bristol"
+      },
+      "usnews": {
+        "rank": 105,
+        "slug": "university-of-bristol-505342"
+      },
+      "the": {
+        "rank": 80,
+        "slug": "university-bristol"
+      },
+      "arwu": {
+        "rank": 98,
+        "slug": "university-of-bristol"
+      }
+    }
+  },
+  {
+    "name": "University of British Columbia",
+    "coords": [
+      -123.246,
+      49.2609
+    ],
+    "homepage": "https://www.ubc.ca",
+    "rankings": {
+      "qs": {
+        "rank": 40,
+        "slug": "university-british-columbia"
+      },
+      "usnews": {
+        "rank": 41,
+        "slug": "university-of-british-columbia-499976"
+      },
+      "the": {
+        "rank": 45,
+        "slug": "university-british-columbia"
+      },
+      "arwu": {
+        "rank": 53,
+        "slug": "university-of-british-columbia"
+      }
+    }
+  },
+  {
+    "name": "University of California Berkeley",
+    "coords": [
+      -122.2711,
+      37.8715
+    ],
+    "homepage": "https://www.berkeley.edu",
+    "rankings": {
+      "qs": {
+        "rank": 17,
+        "slug": "university-california-berkeley-ucb"
+      },
+      "usnews": {
+        "rank": 6,
+        "slug": "university-of-california-berkeley-110635"
+      },
+      "the": {
+        "rank": 9,
+        "slug": "university-california-berkeley"
+      },
+      "arwu": {
+        "rank": 5,
+        "slug": "university-of-california-berkeley"
+      }
+    }
+  },
+  {
+    "name": "University of California Davis",
+    "coords": [
+      -121.7559,
+      38.5449
+    ],
+    "homepage": "https://www.ucdavis.edu",
+    "rankings": {
+      "qs": {
+        "rank": 114,
+        "slug": "university-california-davis"
+      },
+      "usnews": {
+        "rank": 96,
+        "slug": "university-of-california-davis-110644"
+      },
+      "the": {
+        "rank": 64,
+        "slug": "university-california-davis"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "university-of-california-davis"
+      }
+    }
+  },
+  {
+    "name": "University of California Los Angeles",
+    "coords": [
+      -118.4085,
+      34.0689
+    ],
+    "homepage": "https://www.ucla.edu",
+    "rankings": {
+      "qs": {
+        "rank": 46,
+        "slug": "university-california-los-angeles-ucla"
+      },
+      "usnews": {
+        "rank": 13,
+        "slug": "university-of-california-los-angeles-110662"
+      },
+      "the": {
+        "rank": 18,
+        "slug": "university-california-los-angeles"
+      },
+      "arwu": {
+        "rank": 16,
+        "slug": "university-of-california-los-angeles"
+      }
+    }
+  },
+  {
+    "name": "University of California San Diego",
+    "coords": [
+      -117.2382,
+      32.8801
+    ],
+    "homepage": "https://www.ucsd.edu",
+    "rankings": {
+      "qs": {
+        "rank": 66,
+        "slug": "university-california-san-diego-ucsd"
+      },
+      "usnews": {
+        "rank": 21,
+        "slug": "university-of-california-san-diego-110680"
+      },
+      "the": {
+        "rank": 47,
+        "slug": "university-california-san-diego"
+      },
+      "arwu": {
+        "rank": 20,
+        "slug": "university-of-california-san-diego"
+      }
+    }
+  },
+  {
+    "name": "University of California Santa Barbara",
+    "coords": [
+      -119.6982,
+      34.414
+    ],
+    "homepage": "https://www.ucsb.edu",
+    "rankings": {
+      "qs": {
+        "rank": 179,
+        "slug": "university-california-santa-barbara-ucsb"
+      },
+      "usnews": {
+        "rank": 91,
+        "slug": "university-of-california-santa-barbara-110705"
+      },
+      "the": {
+        "rank": 72,
+        "slug": "university-california-santa-barbara"
+      },
+      "arwu": {
+        "rank": 70,
+        "slug": "university-of-california-santa-barbara"
+      }
+    }
+  },
+  {
+    "name": "University of Cambridge",
+    "coords": [
+      -0.118092,
+      52.2053
+    ],
+    "homepage": "https://www.cam.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 6,
+        "slug": "university-cambridge"
+      },
+      "usnews": {
+        "rank": 5,
+        "slug": "university-of-cambridge-502149"
+      },
+      "the": {
+        "rank": 3,
+        "slug": "university-cambridge"
+      },
+      "arwu": {
+        "rank": 4,
+        "slug": "university-of-cambridge"
+      }
+    }
+  },
+  {
+    "name": "University of Chicago",
+    "coords": [
+      -87.6298,
+      41.7896
+    ],
+    "homepage": "https://www.uchicago.edu",
+    "rankings": {
+      "qs": {
+        "rank": 13,
+        "slug": "university-chicago"
+      },
+      "usnews": {
+        "rank": 26,
+        "slug": "university-of-chicago-144050"
+      },
+      "the": {
+        "rank": 15,
+        "slug": "university-chicago"
+      },
+      "arwu": {
+        "rank": 10,
+        "slug": "university-of-chicago"
+      }
+    }
+  },
+  {
+    "name": "University of Chinese Academy of Sciences CAS",
+    "coords": [
+      116.3972,
+      39.9975
+    ],
+    "homepage": "https://www.ucas.ac.cn/",
+    "rankings": {
+      "qs": {
+        "rank": 362,
+        "slug": "university-chinese-academy-sciences-ucas"
+      },
+      "usnews": {
+        "rank": 54,
+        "slug": "university-of-chinese-academy-of-sciences-cas-529679"
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": null,
+        "slug": null
+      }
+    }
+  },
+  {
+    "name": "University of Colorado Boulder",
+    "coords": [
+      -105.2705,
+      40.015
+    ],
+    "homepage": "https://www.colorado.edu",
+    "rankings": {
+      "qs": {
+        "rank": 299,
+        "slug": "university-colorado-boulder"
+      },
+      "usnews": {
+        "rank": 107,
+        "slug": "university-of-colorado-boulder-126614"
+      },
+      "the": {
+        "rank": 159,
+        "slug": "university-colorado-boulder"
+      },
+      "arwu": {
+        "rank": 62,
+        "slug": "university-of-colorado-at-boulder"
+      }
+    }
+  },
+  {
+    "name": "University of Copenhagen",
+    "coords": [
+      12.5683,
+      55.6761
+    ],
+    "homepage": "https://www.ku.dk/",
+    "rankings": {
+      "qs": {
+        "rank": 101,
+        "slug": "university-copenhagen"
+      },
+      "usnews": {
+        "rank": 41,
+        "slug": "university-of-copenhagen-503710"
+      },
+      "the": {
+        "rank": 90,
+        "slug": "university-copenhagen"
+      },
+      "arwu": {
+        "rank": 35,
+        "slug": "university-of-copenhagen"
+      }
+    }
+  },
+  {
+    "name": "University of Edinburgh",
+    "coords": [
+      -3.188267,
+      55.9479
+    ],
+    "homepage": "https://www.ed.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 34,
+        "slug": "university-edinburgh"
+      },
+      "usnews": {
+        "rank": 39,
+        "slug": "university-of-edinburgh-505832"
+      },
+      "the": {
+        "rank": 29,
+        "slug": "university-edinburgh"
+      },
+      "arwu": {
+        "rank": 37,
+        "slug": "the-university-of-edinburgh"
+      }
+    }
+  },
+  {
+    "name": "University of Glasgow",
+    "coords": [
+      -4.2518,
+      55.860916
+    ],
+    "homepage": "https://www.gla.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 79,
+        "slug": "university-glasgow"
+      },
+      "usnews": {
+        "rank": 62,
+        "slug": "university-of-glasgow-500110"
+      },
+      "the": {
+        "rank": 84,
+        "slug": "university-glasgow"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "the-university-of-glasgow"
+      }
+    }
+  },
+  {
+    "name": "University of Groningen",
+    "coords": [
+      6.5667,
+      53.2194
+    ],
+    "homepage": "https://www.rug.nl",
+    "rankings": {
+      "qs": {
+        "rank": 147,
+        "slug": "university-groningen"
+      },
+      "usnews": {
+        "rank": 75,
+        "slug": "university-of-groningen-500967"
+      },
+      "the": {
+        "rank": 82,
+        "slug": "university-groningen"
+      },
+      "arwu": {
+        "rank": 73,
+        "slug": "university-of-groningen"
+      }
+    }
+  },
+  {
+    "name": "University of Helsinki",
+    "coords": [
+      24.9375,
+      60.1699
+    ],
+    "homepage": "https://www.helsinki.fi/en",
+    "rankings": {
+      "qs": {
+        "rank": 116,
+        "slug": "university-helsinki"
+      },
+      "usnews": {
+        "rank": 113,
+        "slug": "university-of-helsinki-501989"
+      },
+      "the": {
+        "rank": 105,
+        "slug": "university-helsinki"
+      },
+      "arwu": {
+        "rank": 94,
+        "slug": "university-of-helsinki"
+      }
+    }
+  },
+  {
+    "name": "University of Hong Kong",
+    "coords": [
+      114.1743,
+      22.28552
+    ],
+    "homepage": "https://www.hku.hk",
+    "rankings": {
+      "qs": {
+        "rank": 11,
+        "slug": "university-hong-kong"
+      },
+      "usnews": {
+        "rank": 44,
+        "slug": "university-of-hong-kong-505046"
+      },
+      "the": {
+        "rank": 33,
+        "slug": "university-hong-kong"
+      },
+      "arwu": {
+        "rank": 99,
+        "slug": "city-university-of-hong-kong"
+      }
+    }
+  },
+  {
+    "name": "University of Illinois Urbana Champaign",
+    "coords": [
+      -88.2272,
+      40.1164
+    ],
+    "homepage": "https://illinois.edu",
+    "rankings": {
+      "qs": {
+        "rank": 70,
+        "slug": "university-illinois-urbana-champaign"
+      },
+      "usnews": {
+        "rank": 109,
+        "slug": "university-of-illinois-urbana-champaign-145637"
+      },
+      "the": {
+        "rank": 41,
+        "slug": "university-illinois-urbana-champaign"
+      },
+      "arwu": {
+        "rank": 53,
+        "slug": "university-of-illinois-at-urbana-champaign"
+      }
+    }
+  },
+  {
+    "name": "University of Leeds",
+    "coords": [
+      -1.548567,
+      53.801277
+    ],
+    "homepage": "https://www.leeds.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 86,
+        "slug": "university-leeds"
+      },
+      "usnews": {
+        "rank": 133,
+        "slug": "university-of-leeds-505265"
+      },
+      "the": {
+        "rank": 118,
+        "slug": "university-leeds"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "university-of-leeds"
+      }
+    }
+  },
+  {
+    "name": "University of Manchester",
+    "coords": [
+      -2.2426,
+      53.466775
+    ],
+    "homepage": "https://www.manchester.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 35,
+        "slug": "university-manchester"
+      },
+      "usnews": {
+        "rank": 68,
+        "slug": "university-of-manchester-500273"
+      },
+      "the": {
+        "rank": 56,
+        "slug": "university-manchester"
+      },
+      "arwu": {
+        "rank": 46,
+        "slug": "the-university-of-manchester"
+      }
+    }
+  },
+  {
+    "name": "University of Maryland College Park",
+    "coords": [
+      -76.9378,
+      38.9869
+    ],
+    "homepage": "https://www.umd.edu",
+    "rankings": {
+      "qs": {
+        "rank": 207,
+        "slug": "university-maryland-college-park"
+      },
+      "usnews": {
+        "rank": 72,
+        "slug": "university-of-maryland-college-park-163286"
+      },
+      "the": {
+        "rank": 116,
+        "slug": "university-maryland-college-park"
+      },
+      "arwu": {
+        "rank": 55,
+        "slug": "university-of-maryland-college-park"
+      }
+    }
+  },
+  {
+    "name": "University of Melbourne",
+    "coords": [
+      144.9631,
+      -37.7983
+    ],
+    "homepage": "https://www.unimelb.edu.au",
+    "rankings": {
+      "qs": {
+        "rank": 19,
+        "slug": "university-melbourne"
+      },
+      "usnews": {
+        "rank": 30,
+        "slug": "university-of-melbourne-501796"
+      },
+      "the": {
+        "rank": 37,
+        "slug": "university-melbourne"
+      },
+      "arwu": {
+        "rank": 38,
+        "slug": "the-university-of-melbourne"
+      }
+    }
+  },
+  {
+    "name": "University of Michigan Ann Arbor",
+    "coords": [
+      -83.743,
+      42.2808
+    ],
+    "homepage": "https://www.umich.edu",
+    "rankings": {
+      "qs": {
+        "rank": 45,
+        "slug": "university-michigan-ann-arbor"
+      },
+      "usnews": {
+        "rank": 21,
+        "slug": "university-of-michigan-170976"
+      },
+      "the": {
+        "rank": 23,
+        "slug": "university-michigan-ann-arbor"
+      },
+      "arwu": {
+        "rank": 33,
+        "slug": "university-of-michigan-ann-arbor"
+      }
+    }
+  },
+  {
+    "name": "University of Minnesota Twin Cities",
+    "coords": [
+      -93.227037,
+      44.9773
+    ],
+    "homepage": "https://twin-cities.umn.edu/",
+    "rankings": {
+      "qs": {
+        "rank": 210,
+        "slug": "university-minnesota-twin-cities"
+      },
+      "usnews": {
+        "rank": 72,
+        "slug": "university-of-minnesota-twin-cities-174066"
+      },
+      "the": {
+        "rank": 88,
+        "slug": "university-minnesota"
+      },
+      "arwu": {
+        "rank": 51,
+        "slug": "university-of-minnesota-twin-cities"
+      }
+    }
+  },
+  {
+    "name": "University of New South Wales",
+    "coords": [
+      151.2314,
+      -33.9172
+    ],
+    "homepage": "https://www.unsw.edu.au",
+    "rankings": {
+      "qs": {
+        "rank": 20,
+        "slug": "university-new-south-wales-unsw-sydney"
+      },
+      "usnews": {
+        "rank": 34,
+        "slug": "university-of-new-south-wales-sydney-502434"
+      },
+      "the": {
+        "rank": 79,
+        "slug": "unsw-sydney"
+      },
+      "arwu": {
+        "rank": 80,
+        "slug": "the-university-of-new-south-wales"
+      }
+    }
+  },
+  {
+    "name": "University of North Carolina Chapel Hill",
+    "coords": [
+      -79.0593,
+      35.9042
+    ],
+    "homepage": "https://www.unc.edu",
+    "rankings": {
+      "qs": {
+        "rank": 140,
+        "slug": "university-north-carolina-chapel-hill"
+      },
+      "usnews": {
+        "rank": 51,
+        "slug": "university-of-north-carolina-chapel-hill-199120"
+      },
+      "the": {
+        "rank": 78,
+        "slug": "university-north-carolina-chapel-hill"
+      },
+      "arwu": {
+        "rank": 39,
+        "slug": "university-of-north-carolina-at-chapel-hill"
+      }
+    }
+  },
+  {
+    "name": "University of Nottingham",
+    "coords": [
+      -1.155652,
+      52.9536
+    ],
+    "homepage": "https://www.nottingham.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 97,
+        "slug": "university-nottingham"
+      },
+      "usnews": {
+        "rank": 153,
+        "slug": "university-of-nottingham-503548"
+      },
+      "the": {
+        "rank": 145,
+        "slug": "university-nottingham"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "university-of-nottingham"
+      }
+    }
+  },
+  {
+    "name": "University of Oslo",
+    "coords": [
+      10.7522,
+      59.9139
+    ],
+    "homepage": "https://www.uio.no/english/",
+    "rankings": {
+      "qs": {
+        "rank": 119,
+        "slug": "university-oslo"
+      },
+      "usnews": {
+        "rank": 100,
+        "slug": "university-of-oslo-502680"
+      },
+      "the": {
+        "rank": 113,
+        "slug": "university-oslo"
+      },
+      "arwu": {
+        "rank": 83,
+        "slug": "university-of-oslo"
+      }
+    }
+  },
+  {
+    "name": "University of Oxford",
+    "coords": [
+      -1.2577,
+      51.752
+    ],
+    "homepage": "https://www.ox.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 4,
+        "slug": "university-oxford"
+      },
+      "usnews": {
+        "rank": 4,
+        "slug": "university-of-oxford-503637"
+      },
+      "the": {
+        "rank": 1,
+        "slug": "university-oxford"
+      },
+      "arwu": {
+        "rank": 6,
+        "slug": "university-of-oxford"
+      }
+    }
+  },
+  {
+    "name": "University of Pennsylvania",
+    "coords": [
+      -75.1652,
+      39.9526
+    ],
+    "homepage": "https://www.upenn.edu",
+    "rankings": {
+      "qs": {
+        "rank": 15,
+        "slug": "university-pennsylvania"
+      },
+      "usnews": {
+        "rank": 15,
+        "slug": "university-of-pennsylvania-215062"
+      },
+      "the": {
+        "rank": 14,
+        "slug": "university-pennsylvania"
+      },
+      "arwu": {
+        "rank": 14,
+        "slug": "university-of-pennsylvania"
+      }
+    }
+  },
+  {
+    "name": "University of Queensland",
+    "coords": [
+      153.0281,
+      -27.4705
+    ],
+    "homepage": "https://www.uq.edu.au/",
+    "rankings": {
+      "qs": {
+        "rank": 42,
+        "slug": "university-queensland"
+      },
+      "usnews": {
+        "rank": 43,
+        "slug": "university-of-queensland-500164"
+      },
+      "the": {
+        "rank": 80,
+        "slug": "university-queensland"
+      },
+      "arwu": {
+        "rank": 65,
+        "slug": "the-university-of-queensland"
+      }
+    }
+  },
+  {
+    "name": "University of Science and Technology of China CAS",
+    "coords": [
+      117.2683,
+      31.8306
+    ],
+    "homepage": "https://www.ustc.edu.cn/",
+    "rankings": {
+      "qs": {
+        "rank": 132,
+        "slug": "university-science-technology-china"
+      },
+      "usnews": {
+        "rank": 71,
+        "slug": "university-of-science-technology-of-china-cas-505547"
+      },
+      "the": {
+        "rank": 51,
+        "slug": "university-science-and-technology-china"
+      },
+      "arwu": {
+        "rank": 40,
+        "slug": "university-of-science-and-technology-of-china"
+      }
+    }
+  },
+  {
+    "name": "University of Sheffield",
+    "coords": [
+      -1.4701,
+      53.3811
+    ],
+    "homepage": "https://www.sheffield.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 92,
+        "slug": "university-sheffield"
+      },
+      "usnews": {
+        "rank": 166,
+        "slug": "university-of-sheffield-503922"
+      },
+      "the": {
+        "rank": 108,
+        "slug": "university-sheffield"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "the-university-of-sheffield"
+      }
+    }
+  },
+  {
+    "name": "University of Southampton",
+    "coords": [
+      -1.4043,
+      50.9368
+    ],
+    "homepage": "https://www.southampton.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 87,
+        "slug": "university-southampton"
+      },
+      "usnews": {
+        "rank": 118,
+        "slug": "university-of-southampton-504892"
+      },
+      "the": {
+        "rank": 129,
+        "slug": "university-southampton"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "university-of-southampton"
+      }
+    }
+  },
+  {
+    "name": "University of Southern California",
+    "coords": [
+      -118.2851,
+      34.0207
+    ],
+    "homepage": "https://www.usc.edu",
+    "rankings": {
+      "qs": {
+        "rank": 146,
+        "slug": "university-southern-california"
+      },
+      "usnews": {
+        "rank": 77,
+        "slug": "university-of-southern-california-123961"
+      },
+      "the": {
+        "rank": 73,
+        "slug": "university-southern-california"
+      },
+      "arwu": {
+        "rank": 68,
+        "slug": "university-of-southern-california"
+      }
+    }
+  },
+  {
+    "name": "University of Sydney",
+    "coords": [
+      151.1902,
+      -33.8688
+    ],
+    "homepage": "https://www.sydney.edu.au",
+    "rankings": {
+      "qs": {
+        "rank": 25,
+        "slug": "university-sydney"
+      },
+      "usnews": {
+        "rank": 29,
+        "slug": "university-of-sydney-505369"
+      },
+      "the": {
+        "rank": 53,
+        "slug": "university-sydney"
+      },
+      "arwu": {
+        "rank": 72,
+        "slug": "university-of-sydney"
+      }
+    }
+  },
+  {
+    "name": "University of Technology Sydney",
+    "coords": [
+      151.2067,
+      -33.8925
+    ],
+    "homepage": "https://www.uts.edu.au/",
+    "rankings": {
+      "qs": {
+        "rank": 96,
+        "slug": "university-technology-sydney"
+      },
+      "usnews": {
+        "rank": 83,
+        "slug": "university-of-technology-sydney-505153"
+      },
+      "the": {
+        "rank": 145,
+        "slug": "university-technology-sydney"
+      },
+      "arwu": {
+        "rank": 201,
+        "slug": "university-of-technology-sydney"
+      }
+    }
+  },
+  {
+    "name": "University of Texas Austin",
+    "coords": [
+      -97.7431,
+      30.2849
+    ],
+    "homepage": "https://www.utexas.edu",
+    "rankings": {
+      "qs": {
+        "rank": 68,
+        "slug": "university-texas-austin"
+      },
+      "usnews": {
+        "rank": 65,
+        "slug": "university-of-texas-austin-228778"
+      },
+      "the": {
+        "rank": 50,
+        "slug": "university-texas-austin"
+      },
+      "arwu": {
+        "rank": 49,
+        "slug": "the-university-of-texas-at-austin"
+      }
+    }
+  },
+  {
+    "name": "University of Texas MD Anderson Cancer Center",
+    "coords": [
+      -95.3985,
+      29.7087
+    ],
+    "homepage": "https://www.mdanderson.org",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": null,
+        "slug": null
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 86,
+        "slug": "the-university-of-texas-m-d-anderson-cancer-center"
+      }
+    }
+  },
+  {
+    "name": "University of Texas Southwestern Medical Center",
+    "coords": [
+      -96.7705,
+      32.8998
+    ],
+    "homepage": "https://www.utsouthwestern.edu",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 103,
+        "slug": "university-of-texas-southwestern-medical-center-dallas-228635"
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 58,
+        "slug": "the-university-of-texas-southwestern-medical-center-at-dallas"
+      }
+    }
+  },
+  {
+    "name": "University of Tokyo",
+    "coords": [
+      139.760941526051, 
+      35.71739675
+    ],
+    "homepage": "https://www.u-tokyo.ac.jp/en/",
+    "rankings": {
+      "qs": {
+        "rank": 36,
+        "slug": "university-tokyo"
+      },
+      "usnews": {
+        "rank": 84,
+        "slug": "university-of-tokyo-500248"
+      },
+      "the": {
+        "rank": 26,
+        "slug": "university-tokyo"
+      },
+      "arwu": {
+        "rank": 31,
+        "slug": "the-university-of-tokyo"
+      }
+    }
+  },
+  {
+    "name": "University of Vienna",
+    "coords": [
+      16.37208,
+      48.2082
+    ],
+    "homepage": "https://www.univie.ac.at/en/",
+    "rankings": {
+      "qs": {
+        "rank": 152,
+        "slug": "university-vienna"
+      },
+      "usnews": {
+        "rank": 212,
+        "slug": "university-of-vienna-505908"
+      },
+      "the": {
+        "rank": 95,
+        "slug": "university-vienna"
+      },
+      "arwu": {
+        "rank": 58,
+        "slug": "university-of-geneva"
+      }
+    }
+  },
+  {
+    "name": "University of Warwick",
+    "coords": [
+      -1.5608,
+      52.3731
+    ],
+    "homepage": "https://warwick.ac.uk",
+    "rankings": {
+      "qs": {
+        "rank": 74,
+        "slug": "university-warwick"
+      },
+      "usnews": {
+        "rank": 182,
+        "slug": "university-of-warwick-503443"
+      },
+      "the": {
+        "rank": 122,
+        "slug": "university-warwick"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "university-of-warwick"
+      }
+    }
+  },
+  {
+    "name": "University of Washington Seattle",
+    "coords": [
+      -122.332071,
+      47.6553
+    ],
+    "homepage": "https://www.washington.edu",
+    "rankings": {
+      "qs": {
+        "rank": 81,
+        "slug": "university-washington"
+      },
+      "usnews": {
+        "rank": 8,
+        "slug": "university-of-washington-seattle-236948"
+      },
+      "the": {
+        "rank": 25,
+        "slug": "university-washington"
+      },
+      "arwu": {
+        "rank": 17,
+        "slug": "university-of-washington"
+      }
+    }
+  },
+  {
+    "name": "University of Western Australia",
+    "coords": [
+      115.8333,
+      -31.9822
+    ],
+    "homepage": "https://www.uwa.edu.au",
+    "rankings": {
+      "qs": {
+        "rank": 77,
+        "slug": "university-western-australia"
+      },
+      "usnews": {
+        "rank": 98,
+        "slug": "university-of-western-australia-503979"
+      },
+      "the": {
+        "rank": 153,
+        "slug": "university-western-australia"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "the-university-of-western-australia"
+      }
+    }
+  },
+  {
+    "name": "University of Wisconsin Madison",
+    "coords": [
+      -89.4012,
+      43.0731
+    ],
+    "homepage": "https://www.wisc.edu",
+    "rankings": {
+      "qs": {
+        "rank": 110,
+        "slug": "university-wisconsin-madison"
+      },
+      "usnews": {
+        "rank": 72,
+        "slug": "university-of-wisconsin-madison-240444"
+      },
+      "the": {
+        "rank": 53,
+        "slug": "university-wisconsin-madison"
+      },
+      "arwu": {
+        "rank": 36,
+        "slug": "university-of-wisconsin-madison"
+      }
+    }
+  },
+  {
+    "name": "University of Zurich",
+    "coords": [
+      8.5417,
+      47.3769
+    ],
+    "homepage": "https://www.uzh.ch",
+    "rankings": {
+      "qs": {
+        "rank": 100,
+        "slug": "university-zurich"
+      },
+      "usnews": {
+        "rank": 59,
+        "slug": "university-of-zurich-505287"
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 64,
+        "slug": "university-of-zurich"
+      }
+    }
+  },
+  {
+    "name": "Université PSL",
+    "coords": [
+      2.3488,
+      48.856614
+    ],
+    "homepage": "https://www.psl.eu/en",
+    "rankings": {
+      "qs": {
+        "rank": 28,
+        "slug": "universite-psl"
+      },
+      "usnews": {
+        "rank": 105,
+        "slug": "universite-psl-529378"
+      },
+      "the": {
+        "rank": 48,
+        "slug": "paris-sciences-et-lettres-psl-research-university-paris"
+      },
+      "arwu": {
+        "rank": 34,
+        "slug": "psl-university"
+      }
+    }
+  },
+  {
+    "name": "Uppsala University",
+    "coords": [
+      17.6389,
+      59.8585645
+    ],
+    "homepage": "https://www.uu.se",
+    "rankings": {
+      "qs": {
+        "rank": 93,
+        "slug": "uppsala-university"
+      },
+      "usnews": {
+        "rank": 141,
+        "slug": "uppsala-university-501990"
+      },
+      "the": {
+        "rank": 128,
+        "slug": "uppsala-university"
+      },
+      "arwu": {
+        "rank": 93,
+        "slug": "uppsala-university"
+      }
+    }
+  },
+  {
+    "name": "Utrecht University",
+    "coords": [
+      5.1173,
+      52.0888
+    ],
+    "homepage": "https://www.uu.nl",
+    "rankings": {
+      "qs": {
+        "rank": 103,
+        "slug": "utrecht-university"
+      },
+      "usnews": {
+        "rank": 49,
+        "slug": "utrecht-university-505962"
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 56,
+        "slug": "utrecht-university"
+      }
+    }
+  },
+  {
+    "name": "Vanderbilt University",
+    "coords": [
+      -86.781602,
+      36.1451
+    ],
+    "homepage": "https://www.vanderbilt.edu",
+    "rankings": {
+      "qs": {
+        "rank": 250,
+        "slug": "vanderbilt-university"
+      },
+      "usnews": {
+        "rank": 66,
+        "slug": "vanderbilt-university-221999"
+      },
+      "the": {
+        "rank": 92,
+        "slug": "vanderbilt-university"
+      },
+      "arwu": {
+        "rank": 62,
+        "slug": "vanderbilt-university"
+      }
+    }
+  },
+  {
+    "name": "Vrije Universiteit Amsterdam",
+    "coords": [
+      4.895168,
+      52.3585
+    ],
+    "homepage": "https://www.vu.nl/en/",
+    "rankings": {
+      "qs": {
+        "rank": 194,
+        "slug": "vrije-universiteit-amsterdam"
+      },
+      "usnews": {
+        "rank": 79,
+        "slug": "vrije-universiteit-amsterdam-500669"
+      },
+      "the": {
+        "rank": 176,
+        "slug": "vrije-universiteit-amsterdam"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "vrije-universiteit-amsterdam"
+      }
+    }
+  },
+  {
+    "name": "Wageningen University and Research",
+    "coords": [
+      5.6672,
+      51.9851
+    ],
+    "homepage": "https://www.wur.nl/en/",
+    "rankings": {
+      "qs": {
+        "rank": 153,
+        "slug": "wageningen-university-research"
+      },
+      "usnews": {
+        "rank": 115,
+        "slug": "wageningen-university-research-501112"
+      },
+      "the": {
+        "rank": 66,
+        "slug": "wageningen-university-research"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "wageningen-university-research"
+      }
+    }
+  },
+  {
+    "name": "Washington University in St. Louis",
+    "coords": [
+      -90.306389,
+      38.6319
+    ],
+    "homepage": "https://wustl.edu",
+    "rankings": {
+      "qs": {
+        "rank": 167,
+        "slug": "washington-university-st-louis"
+      },
+      "usnews": {
+        "rank": 31,
+        "slug": "washington-university-wustl-179867"
+      },
+      "the": {
+        "rank": 67,
+        "slug": "washington-university-st-louis"
+      },
+      "arwu": {
+        "rank": 26,
+        "slug": "washington-university-in-st-louis"
+      }
+    }
+  },
+  {
+    "name": "Weizmann Institute of Science",
+    "coords": [
+      34.8112,
+      32.0689
+    ],
+    "homepage": "https://www.weizmann.ac.il",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 131,
+        "slug": "weizmann-institute-of-science-506795"
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 71,
+        "slug": "weizmann-institute-of-science"
+      }
+    }
+  },
+  {
+    "name": "Xi'an Jiaotong University",
+    "coords": [
+      108.9401,
+      34.2644
+    ],
+    "homepage": "https://en.xjtu.edu.cn",
+    "rankings": {
+      "qs": {
+        "rank": 305,
+        "slug": "xian-jiaotong-university"
+      },
+      "usnews": {
+        "rank": 141,
+        "slug": "xian-jiaotong-university-503987"
+      },
+      "the": {
+        "rank": 201,
+        "slug": "xian-jiaotong-university"
+      },
+      "arwu": {
+        "rank": 92,
+        "slug": "xian-jiaotong-university"
+      }
+    }
+  },
+  {
+    "name": "Yale University",
+    "coords": [
+      -72.9223,
+      41.3111
+    ],
+    "homepage": "https://www.yale.edu",
+    "rankings": {
+      "qs": {
+        "rank": 21,
+        "slug": "yale-university"
+      },
+      "usnews": {
+        "rank": 9,
+        "slug": "yale-university-130794"
+      },
+      "the": {
+        "rank": 10,
+        "slug": "yale-university"
+      },
+      "arwu": {
+        "rank": 11,
+        "slug": "yale-university"
+      }
+    }
+  },
+  {
+    "name": "Yonsei University",
+    "coords": [
+      126.9513,
+      37.5658
+    ],
+    "homepage": "https://www.yonsei.ac.kr/en_sc/",
+    "rankings": {
+      "qs": {
+        "rank": 50,
+        "slug": "yonsei-university"
+      },
+      "usnews": {
+        "rank": 180,
+        "slug": "yonsei-university-503801"
+      },
+      "the": {
+        "rank": 86,
+        "slug": "yonsei-university-seoul-campus"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "yonsei-university"
+      }
+    }
+  },
+  {
+    "name": "Zhejiang University",
+    "coords": [
+      120.0934,
+      30.279611
+    ],
+    "homepage": "https://www.zju.edu.cn/",
+    "rankings": {
+      "qs": {
+        "rank": 49,
+        "slug": "zhejiang-university"
+      },
+      "usnews": {
+        "rank": 45,
+        "slug": "zhejiang-university-504773"
+      },
+      "the": {
+        "rank": 39,
+        "slug": "zhejiang-university"
+      },
+      "arwu": {
+        "rank": 24,
+        "slug": "zhejiang-university"
+      }
+    }
+  },
+  {
+    "name": "City University of Hong Kong",
+    "coords": [
+      114.1836,
+      22.3992
+    ],
+    "homepage": "https://www.cityu.edu.hk",
+    "rankings": {
+      "qs": {
+        "rank": 63,
+        "slug": "city-university-hong-kong"
+      },
+      "usnews": {
+        "rank": 54,
+        "slug": "city-university-of-hong-kong-502667"
+      },
+      "the": {
+        "rank": 75,
+        "slug": "city-university-hong-kong"
+      },
+      "arwu": {
+        "rank": null,
+        "slug": null
+      }
+    }
+  },
+  {
+    "name": "University of Toronto",
+    "coords": [
+      -79.395,
+      43.6629
+    ],
+    "homepage": "https://www.utoronto.ca",
+    "rankings": {
+      "qs": {
+        "rank": 29,
+        "slug": "university-toronto"
+      },
+      "usnews": {
+        "rank": 16,
+        "slug": "university-of-toronto-499968"
+      },
+      "the": {
+        "rank": 21,
+        "slug": "university-toronto"
+      },
+      "arwu": {
+        "rank": 25,
+        "slug": "university-of-toronto"
+      }
+    }
+  },
+  {
+    "name": "Chinese University of Hong Kong (CUHK)",
+    "coords": [
+      114.1722,
+      30.5188
+    ],
+    "homepage": "https://www.cuhk.edu.hk",
+    "rankings": {
+      "qs": {
+        "rank": 32,
+        "slug": "chinese-university-hong-kong-cuhk"
+      },
+      "usnews": {
+        "rank": 37,
+        "slug": "chinese-university-of-hong-kong-502973"
+      },
+      "the": {
+        "rank": 41,
+        "slug": "chinese-university-hong-kong"
+      },
+      "arwu": {
+        "rank": 101,
+        "slug": "the-chinese-university-of-hong-kong"
+      }
+    }
+  },
+  {
+    "name": "University of California, San Francisco",
+    "coords": [
+      -122.39,
+      37.7629
+    ],
+    "homepage": "https://www.ucsf.edu",
+    "rankings": {
+      "qs": {
+        "rank": null,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 16,
+        "slug": "university-of-california-san-francisco-110699"
+      },
+      "the": {
+        "rank": null,
+        "slug": null
+      },
+      "arwu": {
+        "rank": 21,
+        "slug": "university-of-california-san-francisco"
+      }
+    }
+  },
+  {
+    "name": "Fudan University",
+    "coords": [
+      121.5006,
+      31.2981
+    ],
+    "homepage": "https://www.fudan.edu.cn/en/",
+    "rankings": {
+      "qs": {
+        "rank": 30,
+        "slug": "fudan-university"
+      },
+      "usnews": {
+        "rank": 70,
+        "slug": "fudan-university-500824"
+      },
+      "the": {
+        "rank": 36,
+        "slug": "fudan-university"
+      },
+      "arwu": {
+        "rank": 81,
+        "slug": "wuhan-university"
+      }
+    }
+  },
+  {
+    "name": "Georgia Institute of Technology",
+    "coords": [
+      -84.396,
+      33.7756
+    ],
+    "homepage": "https://www.gatech.edu",
+    "rankings": {
+      "qs": {
+        "rank": 123,
+        "slug": "georgia-institute-technology"
+      },
+      "usnews": {
+        "rank": 79,
+        "slug": "georgia-institute-of-technology-139755"
+      },
+      "the": {
+        "rank": 41,
+        "slug": "georgia-institute-technology"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "georgia-institute-of-technology"
+      }
+    }
+  },
+  {
+    "name": "Huazhong University of Science and Technology",
+    "coords": [
+      114.4198,
+      30.5188
+    ],
+    "homepage": "https://en.hust.edu.cn/",
+    "rankings": {
+      "qs": {
+        "rank": 176,
+        "slug": null
+      },
+      "usnews": {
+        "rank": 91,
+        "slug": "huazhong-university-of-science-technology-505190"
+      },
+      "the": {
+        "rank": 176,
+        "slug": "huazhong-university-science-and-technology"
+      },
+      "arwu": {
+        "rank": 73,
+        "slug": "huazhong-university-of-science-and-technology"
+      }
+    }
+  },
+  {
+    "name": "University of Tübingen",
+    "coords": [
+      9.0544,
+      48.5214
+    ],
+    "homepage": "https://www.uni-tuebingen.de",
+    "rankings": {
+      "qs": {
+        "rank": 215,
+        "slug": "eberhard-karls-universitat-tubingen"
+      },
+      "usnews": {
+        "rank": 200,
+        "slug": "eberhard-karls-university-of-tubingen-503424"
+      },
+      "the": {
+        "rank": 98,
+        "slug": "university-tubingen"
+      },
+      "arwu": {
+        "rank": 151,
+        "slug": "university-of-tuebingen"
+      }
+    }
+  }
+];
+
+	const rankTypes = [
+		{ "type": "qs", "name": "QS排名", "color": "#FECC06" },
+		{ "type": "usnews", "name": "U.S. News排名", "color": "#015FA5" },
+		{ "type": "the", "name": "THE排名", "color": "#B21888" },
+		{ "type": "arwu", "name": "ARWU排名", "color": "#E4012E" }
+	];
+
+  let currentRankType = 'qs'; // 默认QS排名
+
+  // ====== 2. 工具函数 ======
+  // 构建排名链接（原代码不变）
+  function buildRankingUrl(type, slug) {
+    if (slug == null) return '#';
+    const template = RANKING_URL_TEMPLATES[type];
+    return template ? template.replace('{slug}', encodeURIComponent(slug)) : '#';
+  }
+  // 转义URL（原代码不变）
+  function escapeUrl(url) {
+    return url ? url.replace(/"/g, '%22').replace(/'/g, '%27') : '#';
+  }
+  // 新增：Top筛选工具函数（筛选指定排名类型下的TopN高校）
+  function filterTopUniversities(universities, rankType, topNum) {
+    // ALL：返回所有有有效排名的高校（排除rank为null的）
+    if (topNum === 'all') {
+      return universities.filter(u => u.rankings[rankType]?.rank !== null);
+    }
+    // TopN：筛选排名≤TopNum且有有效排名的高校
+    const top = Number(topNum);
+    return universities
+      .filter(u => u.rankings[rankType]?.rank !== null)
+      .filter(u => u.rankings[rankType].rank <= top);
+  }
+
+  // ====== 3. 数据处理函数（整合Top筛选） ======
+  function getSeriesData(rankType, topNum = 'all') {
+    // 第一步：先筛选符合Top条件的高校
+    const filteredUnis = filterTopUniversities(universities, rankType, topNum);
+    // 第二步：基于筛选后的数据计算排名边界（确保符号大小映射准确）
+    const maxRank = Math.max(...filteredUnis.map(u => u.rankings[rankType].rank || 300));
+    const minRank = Math.min(...filteredUnis.map(u => u.rankings[rankType].rank || 1));
+    // 第三步：生成散点图数据（符号大小映射逻辑不变）
+    return filteredUnis.map(u => {
+      const rank = u.rankings[rankType].rank;
+      const symbolSize = 8 + (maxRank - rank) / (maxRank - minRank) * 12;
+      return {
+        name: u.name,
+        value: [...u.coords, rank],
+        homepage: u.homepage,
+        rankings: u.rankings,
+        symbolSize: symbolSize,
+        itemStyle: {
+          color: rankTypes.find(r => r.type === rankType).color
+        }
+      };
+    });
+  }
+
+  // ====== 4. 图表更新函数（支持Top筛选参数） ======
+  function updateChart(rankType, topNum = 'all') {
+    currentRankType = rankType;
+    // 1. 更新Logo激活状态
+    document.querySelectorAll('.rank-logo').forEach(img => {
+      img.classList.toggle('active', img.dataset.type === rankType);
+    });
+    // 2. 获取筛选后的散点数据
+    const seriesData = getSeriesData(rankType, topNum);
+    // 3. 图表配置项（Tooltip等逻辑与原代码一致）
+    const option = {
+      tooltip: {
+        trigger: 'item',
+        confine: true,
+        appendToBody: true,
+        enterable: true,
+        hideDelay: 2000,
+        backgroundColor: 'rgba(255, 255, 255, 0.96)',
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 10,
+        position: function (point) {
+          return [point[0] + 10, point[1] - 10];
+        },
+        textStyle: { color: '#333', fontSize: 13 },
+        extraCssText: 'box-shadow: 0 2px 10px rgba(0,0,0,0.15); max-width: 280px; pointer-events: auto;',
+        formatter: function (params) {
+          const { name, homepage, rankings } = params.data;
+          const encodedName = encodeURIComponent(name);
+          const safeHomepage = escapeUrl(homepage);
+          // 排名HTML生成函数
+          const getRankHtml = (type, label, colorCode) => {
+            const rankObj = rankings[type];
+            if (!rankObj || rankObj.rank === null || rankObj.rank === undefined) {
+              return '';
+            }
+            const url = buildRankingUrl(type, rankObj.slug);
+            const isActive = currentRankType === type;
+            const color = isActive ? colorCode : '#555';
+            return `<strong>${label}:</strong> <a href="${url}" target="_blank" style="color: ${color}; text-decoration: none;">#${rankObj.rank}</a>`;
+          };
+          const qsHtml = getRankHtml('qs', 'QS', '#FECC06');
+          const theHtml = getRankHtml('the', 'THE', '#B21888');
+          const usnewsHtml = getRankHtml('usnews', 'US News', '#015FA5');
+          const arwuHtml = getRankHtml('arwu', 'ARWU', '#E4012E');
+          // 排版排名信息
+          let line1 = qsHtml || theHtml ? `<div>${qsHtml}${qsHtml && theHtml ? '&nbsp;&nbsp;' : ''}${theHtml}</div>` : '';
+          let line2 = usnewsHtml || arwuHtml ? `<div style="margin-top: 4px;">${usnewsHtml}${usnewsHtml && arwuHtml ? '&nbsp;&nbsp;' : ''}${arwuHtml}</div>` : '';
+          const rankSection = (line1 || line2) ? `<div style="font-size: 13px;">${line1}${line2}</div>` : '';
+          // Tooltip最终HTML
+          return `
+            <div style="font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 8px;">
+              <a href="${safeHomepage}" target="_blank" style="color: #1890ff; text-decoration: none;">${name}</a>
+            </div>
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+              <img src="logo/${encodedName}.png"
+                   style="width: 50px; height: 50px; object-fit: contain; flex-shrink: 0;"
+                   onerror="this.style.display='none'"/>
+              ${rankSection}
+            </div>`;
+        }
+      },
+      geo: {
+        map: 'world',
+        roam: true,
+        itemStyle: {
+          areaColor: '#f8f9fa',
+          borderColor: '#d0d0d0'
+        },
+        emphasis: {
+          itemStyle: {
+            areaColor: '#e9ecef'
+          }
+        }
+      },
+      series: [{
+        type: 'scatter',
+        coordinateSystem: 'geo',
+        data: seriesData,
+        symbol: 'circle',
+        itemStyle: {},
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0,0,0,0.3)'
+          }
+        }
+      }]
+    };
+    chart.setOption(option, true); // 完全替换配置，避免缓存
+  }
+
+  // ====== 5. 初始化与事件绑定 ======
+  // 初始化图表
+  const chart = echarts.init(document.getElementById('chart'));
+  updateChart(currentRankType); // 默认显示QS排名+ALL数据
+
+  // 1. 排名类型切换（Logo点击）
+  document.querySelectorAll('.rank-logo').forEach(img => {
+    img.addEventListener('click', () => {
+      const type = img.dataset.type;
+      const currentTop = document.getElementById('rankFilter').value; // 保留当前筛选的Top值
+      updateChart(type, currentTop);
+    });
+  });
+
+  // 2. Top筛选切换（下拉菜单change）
+  document.getElementById('rankFilter').addEventListener('change', (e) => {
+    const topNum = e.target.value;
+    updateChart(currentRankType, topNum); // 保留当前排名类型
+  });
+
+  // 窗口大小变化时重绘图表（可选优化，提升体验）
+  window.addEventListener('resize', () => {
+    chart.resize();
+  });
+</script>
+</body>
+</html>
