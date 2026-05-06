@@ -2285,179 +2285,219 @@
   }
 ];
 
-	const rankTypes = [
-		{ "type": "qs", "name": "QS排名", "color": "#FECC06" },
-		{ "type": "usnews", "name": "U.S. News排名", "color": "#015FA5" },
-		{ "type": "the", "name": "THE排名", "color": "#B21888" },
-		{ "type": "arwu", "name": "ARWU排名", "color": "#E4012E" }
-	];
+    const rankTypes = [
+      { "type": "qs", "name": "QS排名", "color": "#FECC06" },
+      { "type": "usnews", "name": "U.S. News排名", "color": "#015FA5" },
+      { "type": "the", "name": "THE排名", "color": "#B21888" },
+      { "type": "arwu", "name": "ARWU排名", "color": "#E4012E" }
+    ];
+    
+    let currentRankType = 'qs';
 
-  let currentRankType = 'qs'; // 默认QS排名
-
-  // ====== 2. 工具函数 ======
-  // 构建排名链接（原代码不变）
-  function buildRankingUrl(type, slug) {
-    if (slug == null) return '#';
-    const template = RANKING_URL_TEMPLATES[type];
-    return template ? template.replace('{slug}', encodeURIComponent(slug)) : '#';
-  }
-  // 转义URL（原代码不变）
-  function escapeUrl(url) {
-    return url ? url.replace(/"/g, '%22').replace(/'/g, '%27') : '#';
-  }
-  // 新增：Top筛选工具函数（筛选指定排名类型下的TopN高校）
-  function filterTopUniversities(universities, rankType, topNum) {
-    // ALL：返回所有有有效排名的高校（排除rank为null的）
-    if (topNum === 'all') {
-      return universities.filter(u => u.rankings[rankType]?.rank !== null);
+    // ====== 2. 修正核心：提取排名数字 ======
+    // 这是修复的关键：将 "150-200" 转换为 150，将 "101-150" 转换为 101
+    // 如果无法转换，则返回一个很大的数字（99999），使其排在最后且不显示
+    function getRankNumber(rankValue) {
+      if (rankValue === null || rankValue === undefined) return 99999;
+      
+      const str = String(rankValue).trim();
+      
+      // 如果包含短横线 "-"，取前面的部分
+      if (str.includes('-')) {
+        const firstPart = str.split('-')[0];
+        const num = parseInt(firstPart);
+        return isNaN(num) ? 99999 : num;
+      }
+      
+      // 如果是纯数字字符串
+      const num = parseInt(str);
+      return isNaN(num) ? 99999 : num;
     }
-    // TopN：筛选排名≤TopNum且有有效排名的高校
-    const top = Number(topNum);
-    return universities
-      .filter(u => u.rankings[rankType]?.rank !== null)
-      .filter(u => u.rankings[rankType].rank <= top);
-  }
 
-  // ====== 3. 数据处理函数（整合Top筛选） ======
-  function getSeriesData(rankType, topNum = 'all') {
-    // 第一步：先筛选符合Top条件的高校
-    const filteredUnis = filterTopUniversities(universities, rankType, topNum);
-    // 第二步：基于筛选后的数据计算排名边界（确保符号大小映射准确）
-    const maxRank = Math.max(...filteredUnis.map(u => u.rankings[rankType].rank || 300));
-    const minRank = Math.min(...filteredUnis.map(u => u.rankings[rankType].rank || 1));
-    // 第三步：生成散点图数据（符号大小映射逻辑不变）
-    return filteredUnis.map(u => {
-      const rank = u.rankings[rankType].rank;
-      const symbolSize = 8 + (maxRank - rank) / (maxRank - minRank) * 12;
-      return {
-        name: u.name,
-        value: [...u.coords, rank],
-        homepage: u.homepage,
-        rankings: u.rankings,
-        symbolSize: symbolSize,
-        itemStyle: {
-          color: rankTypes.find(r => r.type === rankType).color
+    // 构建排名链接
+    function buildRankingUrl(type, slug) {
+      if (!slug) return '#';
+      const template = RANKING_URL_TEMPLATES[type];
+      return template ? template.replace('{slug}', encodeURIComponent(slug)) : '#';
+    }
+
+    // 转义URL
+    function escapeUrl(url) {
+      return url ? url.replace(/"/g, '%22').replace(/'/g, '%27') : '#';
+    }
+
+    // 筛选高校（使用修正后的 getRankNumber 进行比较）
+    function filterTopUniversities(universities, rankType, topNum) {
+      if (topNum === 'all') {
+        return universities.filter(u => 
+          u.rankings[rankType]?.rank !== null && 
+          u.rankings[rankType]?.rank !== undefined
+        );
+      }
+      
+      const top = Number(topNum);
+      return universities.filter(u => {
+        const rankData = u.rankings[rankType];
+        // 检查排名是否存在且不为 null
+        if (!rankData || rankData.rank === null || rankData.rank === undefined) return false;
+        
+        // 使用 getRankNumber 将 "150-200" 转换为 150 再进行比较
+        const rankNum = getRankNumber(rankData.rank);
+        return rankNum <= top;
+      });
+    }
+
+    // ====== 3. 数据处理函数 ======
+    function getSeriesData(rankType, topNum = 'all') {
+      const filteredUnis = filterTopUniversities(universities, rankType, topNum);
+      
+      // 如果没有数据，直接返回空数组
+      if (filteredUnis.length === 0) return [];
+
+      // 计算最大最小排名时，必须使用 getRankNumber 处理
+      // 过滤掉无效数据
+      const validRanks = filteredUnis
+        .map(u => getRankNumber(u.rankings[rankType].rank))
+        .filter(rank => rank !== 99999);
+
+      if (validRanks.length === 0) return [];
+
+      const maxRank = Math.max(...validRanks);
+      const minRank = Math.min(...validRanks);
+
+      // 防止除以零的情况（如果所有学校排名相同）
+      const range = maxRank - minRank;
+
+      return filteredUnis.map(u => {
+        const rawRank = u.rankings[rankType].rank;
+        const rankNum = getRankNumber(rawRank);
+
+        // 如果排名无效，跳过
+        if (rankNum === 99999) return null;
+
+        // 计算气泡大小，如果范围为0，则使用默认大小
+        let symbolSize;
+        if (range === 0) {
+          symbolSize = 15; // 默认大小
+        } else {
+          symbolSize = 8 + ((maxRank - rankNum) / range) * 12;
         }
+
+        return {
+          name: u.name,
+          value: [...u.coords, rankNum],
+          homepage: u.homepage,
+          rankings: u.rankings,
+          symbolSize: symbolSize,
+          itemStyle: { color: rankTypes.find(r => r.type === rankType).color }
+        };
+      }).filter(item => item !== null); // 过滤掉无效项
+    }
+
+    // ====== 4. 图表更新函数 ======
+    function updateChart(rankType, topNum = 'all') {
+      currentRankType = rankType;
+
+      // 更新Logo状态
+      document.querySelectorAll('.rank-logo').forEach(img => {
+        img.classList.toggle('active', img.dataset.type === rankType);
+      });
+
+      // 获取数据
+      const seriesData = getSeriesData(rankType, topNum);
+
+      const option = {
+        tooltip: {
+          trigger: 'item',
+          confine: true,
+          appendToBody: true,
+          enterable: true,
+          hideDelay: 2000,
+          backgroundColor: 'rgba(255, 255, 255, 0.96)',
+          borderColor: '#ddd',
+          borderRadius: 8,
+          padding: 10,
+          position: function (point) { return [point[0] + 10, point[1] - 10]; },
+          textStyle: { color: '#333', fontSize: 13 },
+          extraCssText: 'box-shadow: 0 2px 10px rgba(0,0,0,0.15); max-width: 280px; pointer-events: auto;',
+          formatter: function (params) {
+            if (!params.data) return 'No Data';
+            const { name, homepage, rankings } = params.data;
+            const encodedName = encodeURIComponent(name);
+            const safeHomepage = escapeUrl(homepage);
+
+            const getRankHtml = (type, label, colorCode) => {
+              const rankObj = rankings[type];
+              if (!rankObj || rankObj.rank === null || rankObj.rank === undefined) {
+                return '';
+              }
+              const url = buildRankingUrl(type, rankObj.slug);
+              const isActive = currentRankType === type;
+              const color = isActive ? colorCode : '#555';
+              return `<strong>${label}:</strong> <a href="${url}" target="_blank" style="color: ${color}; text-decoration: none;">#${rankObj.rank}</a>`;
+            };
+
+            const qsHtml = getRankHtml('qs', 'QS', '#FECC06');
+            const theHtml = getRankHtml('the', 'THE', '#B21888');
+            const usnewsHtml = getRankHtml('usnews', 'US News', '#015FA5');
+            const arwuHtml = getRankHtml('arwu', 'ARWU', '#E4012E');
+
+            let line1 = qsHtml || theHtml ? `<div>${qsHtml}${qsHtml && theHtml ? '&nbsp;&nbsp;' : ''}${theHtml}</div>` : '';
+            let line2 = usnewsHtml || arwuHtml ? `<div style="margin-top: 4px;">${usnewsHtml}${usnewsHtml && arwuHtml ? '&nbsp;&nbsp;' : ''}${arwuHtml}</div>` : '';
+            const rankSection = (line1 || line2) ? `<div style="font-size: 13px;">${line1}${line2}</div>` : '';
+
+            return ` 
+              <div style="font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 8px;"> 
+                <a href="${safeHomepage}" target="_blank" style="color: #1890ff; text-decoration: none;">${name}</a> 
+              </div> 
+              <div style="display: flex; align-items: flex-start; gap: 10px;"> 
+                <img src="logos/${encodedName}.png" style="width: 50px; height: 50px; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'"/>
+                ${rankSection} 
+              </div>`;
+          }
+        },
+        geo: {
+          map: 'world',
+          roam: true,
+          itemStyle: { areaColor: '#f8f9fa', borderColor: '#d0d0d0' },
+          emphasis: { itemStyle: { areaColor: '#e9ecef' } }
+        },
+        series: [{
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: seriesData,
+          symbol: 'circle',
+          itemStyle: {},
+          emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } }
+        }]
       };
-    });
-  }
 
-  // ====== 4. 图表更新函数（支持Top筛选参数） ======
-  function updateChart(rankType, topNum = 'all') {
-    currentRankType = rankType;
-    // 1. 更新Logo激活状态
+      chart.setOption(option, true);
+    }
+
+    // ====== 5. 初始化 ======
+    const chart = echarts.init(document.getElementById('chart'));
+    
+    // 确保 DOM 加载完成后初始化
+    window.addEventListener('load', () => {
+      updateChart(currentRankType);
+    });
+
+    // 事件绑定
     document.querySelectorAll('.rank-logo').forEach(img => {
-      img.classList.toggle('active', img.dataset.type === rankType);
+      img.addEventListener('click', () => {
+        const type = img.dataset.type;
+        const currentTop = document.getElementById('rankFilter').value;
+        updateChart(type, currentTop);
+      });
     });
-    // 2. 获取筛选后的散点数据
-    const seriesData = getSeriesData(rankType, topNum);
-    // 3. 图表配置项（Tooltip等逻辑与原代码一致）
-    const option = {
-      tooltip: {
-        trigger: 'item',
-        confine: true,
-        appendToBody: true,
-        enterable: true,
-        hideDelay: 2000,
-        backgroundColor: 'rgba(255, 255, 255, 0.96)',
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 10,
-        position: function (point) {
-          return [point[0] + 10, point[1] - 10];
-        },
-        textStyle: { color: '#333', fontSize: 13 },
-        extraCssText: 'box-shadow: 0 2px 10px rgba(0,0,0,0.15); max-width: 280px; pointer-events: auto;',
-        formatter: function (params) {
-          const { name, homepage, rankings } = params.data;
-          const encodedName = encodeURIComponent(name);
-          const safeHomepage = escapeUrl(homepage);
-          // 排名HTML生成函数
-          const getRankHtml = (type, label, colorCode) => {
-            const rankObj = rankings[type];
-            if (!rankObj || rankObj.rank === null || rankObj.rank === undefined) {
-              return '';
-            }
-            const url = buildRankingUrl(type, rankObj.slug);
-            const isActive = currentRankType === type;
-            const color = isActive ? colorCode : '#555';
-            return `<strong>${label}:</strong> <a href="${url}" target="_blank" style="color: ${color}; text-decoration: none;">#${rankObj.rank}</a>`;
-          };
-          const qsHtml = getRankHtml('qs', 'QS', '#FECC06');
-          const theHtml = getRankHtml('the', 'THE', '#B21888');
-          const usnewsHtml = getRankHtml('usnews', 'US News', '#015FA5');
-          const arwuHtml = getRankHtml('arwu', 'ARWU', '#E4012E');
-          // 排版排名信息
-          let line1 = qsHtml || theHtml ? `<div>${qsHtml}${qsHtml && theHtml ? '&nbsp;&nbsp;' : ''}${theHtml}</div>` : '';
-          let line2 = usnewsHtml || arwuHtml ? `<div style="margin-top: 4px;">${usnewsHtml}${usnewsHtml && arwuHtml ? '&nbsp;&nbsp;' : ''}${arwuHtml}</div>` : '';
-          const rankSection = (line1 || line2) ? `<div style="font-size: 13px;">${line1}${line2}</div>` : '';
-          // Tooltip最终HTML
-          return `
-            <div style="font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 8px;">
-              <a href="${safeHomepage}" target="_blank" style="color: #1890ff; text-decoration: none;">${name}</a>
-            </div>
-            <div style="display: flex; align-items: flex-start; gap: 10px;">
-              <img src="logos/${encodedName}.png"
-                   style="width: 50px; height: 50px; object-fit: contain; flex-shrink: 0;"
-                   onerror="this.style.display='none'"/>
-              ${rankSection}
-            </div>`;
-        }
-      },
-      geo: {
-        map: 'world',
-        roam: true,
-        itemStyle: {
-          areaColor: '#f8f9fa',
-          borderColor: '#d0d0d0'
-        },
-        emphasis: {
-          itemStyle: {
-            areaColor: '#e9ecef'
-          }
-        }
-      },
-      series: [{
-        type: 'scatter',
-        coordinateSystem: 'geo',
-        data: seriesData,
-        symbol: 'circle',
-        itemStyle: {},
-        emphasis: {
-          itemStyle: {
-            shadowBlur: 10,
-            shadowColor: 'rgba(0,0,0,0.3)'
-          }
-        }
-      }]
-    };
-    chart.setOption(option, true); // 完全替换配置，避免缓存
-  }
 
-  // ====== 5. 初始化与事件绑定 ======
-  // 初始化图表
-  const chart = echarts.init(document.getElementById('chart'));
-  updateChart(currentRankType); // 默认显示QS排名+ALL数据
-
-  // 1. 排名类型切换（Logo点击）
-  document.querySelectorAll('.rank-logo').forEach(img => {
-    img.addEventListener('click', () => {
-      const type = img.dataset.type;
-      const currentTop = document.getElementById('rankFilter').value; // 保留当前筛选的Top值
-      updateChart(type, currentTop);
+    document.getElementById('rankFilter').addEventListener('change', (e) => {
+      const topNum = e.target.value;
+      updateChart(currentRankType, topNum);
     });
-  });
 
-  // 2. Top筛选切换（下拉菜单change）
-  document.getElementById('rankFilter').addEventListener('change', (e) => {
-    const topNum = e.target.value;
-    updateChart(currentRankType, topNum); // 保留当前排名类型
-  });
-
-  // 窗口大小变化时重绘图表（可选优化，提升体验）
-  window.addEventListener('resize', () => {
-    chart.resize();
-  });
-</script>
+    window.addEventListener('resize', () => { chart.resize(); });
+  </script>
 </body>
 </html>
